@@ -15,7 +15,7 @@
     --card:rgba(30,41,59,.72); --card2:#222f45; --line:rgba(148,163,184,.16); --line2:rgba(148,163,184,.28);
     --txt:#f1f5f9; --muted:#9aa7bd; --accent:#22c55e; --accent-d:#16a34a; --accent2:#3b82f6; --accent2-d:#2563eb;
     --warn:#fbbf24; --danger:#f43f5e; --radius:18px;
-    --safe-b: env(safe-area-inset-bottom, 0px);
+    --safe-b: env(safe-area-inset-bottom, 0px); --safe-t: env(safe-area-inset-top, 0px);
     --shadow:0 10px 30px -12px rgba(0,0,0,.6);
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
@@ -28,12 +28,13 @@
     background-attachment:fixed;
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
     font-size:17px; line-height:1.4; letter-spacing:-.01em; overscroll-behavior-y:contain;
-    padding: max(env(safe-area-inset-top,0px), 10px) 0 calc(88px + var(--safe-b));}
+    padding: max(var(--safe-t), 10px) 0 calc(88px + var(--safe-b));}
   .wrap{max-width:600px; margin:0 auto; padding:8px 16px;}
   section{animation:fade .35s ease both;}
   @keyframes fade{from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:none;}}
   @media (prefers-reduced-motion:reduce){*{animation:none !important; transition:none !important;}}
   h1{font-size:1.55rem; font-weight:800; margin:2px 0; letter-spacing:-.02em;}
+  .loghead{display:flex; justify-content:space-between; align-items:center; padding-right:52px;}
   .sub{color:var(--muted); font-size:.88rem; margin-bottom:14px;}
   .card{background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
     padding:18px; margin-bottom:14px; box-shadow:var(--shadow); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);}
@@ -62,6 +63,16 @@
   .chip.on{background:linear-gradient(180deg,var(--accent2),var(--accent2-d)); border-color:transparent;
     color:#fff; font-weight:700; box-shadow:0 6px 16px -6px rgba(59,130,246,.7);}
   .chip.cb.on{background:linear-gradient(180deg,var(--danger),#e11d48); box-shadow:0 6px 16px -6px rgba(244,63,94,.7);}
+  .chip.add{border-style:dashed; color:var(--muted);}
+  .hint-inline{font-size:.72rem; color:#64748b; margin-top:7px;}
+  /* combobox */
+  .combo{position:relative;}
+  .combo-list{position:absolute; left:0; right:0; top:calc(100% + 4px); z-index:40; background:#1b2538;
+    border:1px solid var(--line2); border-radius:13px; box-shadow:var(--shadow); max-height:248px; overflow:auto; display:none;}
+  .combo-list.open{display:block;}
+  .combo-list div{padding:13px 14px; font-size:.98rem; border-bottom:1px solid var(--line); cursor:pointer;}
+  .combo-list div:last-child{border-bottom:none;}
+  .combo-list div.add{color:var(--accent); font-weight:700;}
   /* range slider */
   .slider{display:flex; align-items:center; gap:14px;}
   .slider output{min-width:78px; text-align:right; font-weight:800; font-size:1.05rem; white-space:nowrap;}
@@ -83,6 +94,12 @@
   .btn + .btn{margin-top:10px;}
   .divider{display:flex; align-items:center; gap:12px; margin:22px 0 4px; color:var(--muted); font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em;}
   .divider::before,.divider::after{content:""; flex:1; height:1px; background:var(--line);}
+  .export-link{display:inline-flex; align-items:center; gap:6px; background:none; border:none; color:var(--muted);
+    font-size:.85rem; font-weight:600; text-decoration:underline; cursor:pointer; padding:6px 0; min-height:auto;}
+  .cog{position:fixed; top:max(var(--safe-t),10px); right:14px; z-index:60; width:46px; height:46px; border-radius:50%;
+    background:var(--card); border:1px solid var(--line2); color:var(--txt); font-size:1.25rem; line-height:1;
+    display:flex; align-items:center; justify-content:center; box-shadow:var(--shadow);
+    backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); cursor:pointer;}
   nav{position:fixed; left:0; right:0; bottom:0; display:flex; padding-bottom:var(--safe-b); z-index:50;
     background:rgba(11,17,32,.78); border-top:1px solid var(--line); backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px);}
   nav button{position:relative; flex:1; background:none; border:none; color:var(--muted); font-size:.68rem; font-weight:700;
@@ -119,20 +136,30 @@
     border:1px solid var(--line2); letter-spacing:.04em; text-transform:uppercase;}
   .cloud.on{color:var(--accent); border-color:rgba(34,197,94,.4); background:rgba(34,197,94,.12);}
   small.hint{display:block; color:var(--muted); font-size:.78rem; margin-top:10px; line-height:1.45;}
+  .modal{position:fixed; inset:0; z-index:100; display:none; align-items:flex-end; justify-content:center;
+    background:rgba(2,6,16,.65); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);}
+  .modal.open{display:flex;}
+  .modal-card{background:#16203a; border:1px solid var(--line2); border-radius:20px 20px 0 0;
+    padding:22px 18px calc(22px + var(--safe-b)); width:100%; max-width:600px; box-shadow:0 -10px 40px rgba(0,0,0,.6); animation:slideUp .25s ease;}
+  @keyframes slideUp{from{transform:translateY(50px); opacity:.5;} to{transform:none; opacity:1;}}
+  .modal-card h3{margin:0 0 4px; font-size:1.2rem;}
+  .cust-opt{background:var(--card2); border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:11px;}
+  .cust-opt .cars{font-size:.82rem; color:var(--muted); margin:4px 0 12px;}
 </style>
 </head>
 <body>
+
+<button class="cog" id="cogBtn" aria-label="Settings">⚙️</button>
+
 <div class="wrap">
 
   <!-- LOG -->
   <section id="view-log">
-    <div style="display:flex; justify-content:space-between; align-items:center;">
-      <div><h1>Log a job</h1><div class="sub">Fill it in when the job's done</div></div>
-      <span id="cloudBadge" class="cloud">local</span>
-    </div>
+    <div class="loghead"><h1>Log a job</h1><span id="cloudBadge" class="cloud">local</span></div>
+    <div class="sub">Fill it in when the job's done</div>
 
     <div class="card">
-      <label>Job type</label>
+      <label>Job type <span class="opt">(tap all that apply)</span></label>
       <div class="chips" id="jobTypeChips"></div>
 
       <label>Time spent</label>
@@ -155,10 +182,29 @@
       <label>Date <span class="opt">(defaults to today, change to back-date)</span></label>
       <input id="jobDate" type="date" />
 
-      <label>Vehicle <span class="opt">(make &amp; model)</span></label>
-      <div class="row">
-        <input id="make" placeholder="Make" autocomplete="off" />
-        <input id="model" placeholder="Model" autocomplete="off" />
+      <label>Customer name</label>
+      <div class="combo">
+        <input id="customer" placeholder="Full name — type to search" autocomplete="off" />
+        <div class="combo-list" id="customerList"></div>
+      </div>
+      <div id="customerCars" class="chips" style="margin-top:10px;"></div>
+
+      <label>Customer phone <span class="opt">(optional — builds your CRM)</span></label>
+      <input id="phone" type="tel" inputmode="tel" placeholder="e.g. 07700 900123" autocomplete="off" />
+
+      <label>Registration <span class="opt">(number plate)</span></label>
+      <input id="reg" placeholder="e.g. AB12 CDE" autocomplete="off" style="text-transform:uppercase;" />
+
+      <label>Make</label>
+      <div class="combo">
+        <input id="make" placeholder="Type to search makes" autocomplete="off" />
+        <div class="combo-list" id="makeList"></div>
+      </div>
+
+      <label>Model</label>
+      <div class="combo">
+        <input id="model" placeholder="Type to search models" autocomplete="off" />
+        <div class="combo-list" id="modelList"></div>
       </div>
 
       <label>Vehicle age</label>
@@ -172,9 +218,6 @@
         <div class="unit"><input id="estHrs" type="number" inputmode="numeric" min="0" placeholder="0" /><b>hrs</b></div>
         <div class="unit"><input id="estMins" type="number" inputmode="numeric" min="0" max="59" placeholder="0" /><b>min</b></div>
       </div>
-
-      <label>Customer <span class="opt">(name or reg)</span></label>
-      <input id="customer" placeholder="e.g. John / AB12 CDE" autocomplete="off" />
 
       <label>Notes</label>
       <textarea id="notes" rows="2" placeholder="Anything worth remembering"></textarea>
@@ -192,7 +235,6 @@
   <section id="view-jobs" style="display:none;">
     <h1>Jobs</h1>
     <div class="sub" id="jobsCount">No jobs yet</div>
-    <button class="btn blue" id="exportBtn" style="margin-bottom:14px;">⬇ Export CSV</button>
     <div id="jobsList"></div>
   </section>
 
@@ -213,22 +255,22 @@
 
   <!-- SETTINGS -->
   <section id="view-settings" style="display:none;">
+    <button class="btn grey" id="settingsBack" style="margin-bottom:14px;">‹ Back</button>
     <h1>Settings</h1>
     <div class="card">
       <div style="font-weight:700; margin-bottom:4px;">Cloud sync</div>
-      <div class="muted" style="font-size:.85rem;">Paste your Supabase details to back jobs up online. Leave blank to keep everything on this phone. See the setup guide.</div>
+      <div class="muted" style="font-size:.85rem;">Your jobs back up to Supabase automatically. Leave blank to keep everything on this phone only.</div>
       <label>Supabase URL</label>
       <input id="supaUrl" placeholder="https://xxxx.supabase.co" autocomplete="off" />
-      <label>Supabase anon key</label>
-      <input id="supaKey" placeholder="eyJ..." autocomplete="off" />
+      <label>Supabase key</label>
+      <input id="supaKey" placeholder="sb_publishable_…" autocomplete="off" />
       <button class="btn blue" id="saveSupaBtn" style="margin-top:14px;">Save &amp; connect</button>
       <button class="btn grey" id="syncBtn">Sync now</button>
       <small class="hint" id="supaStatus"></small>
     </div>
     <div class="card">
-      <div style="font-weight:700; margin-bottom:12px;">Data</div>
-      <button class="btn blue" id="exportBtn2">⬇ Export all as CSV</button>
-      <button class="btn red" id="wipeBtn">Delete all jobs</button>
+      <div style="font-weight:700; margin-bottom:6px;">Data</div>
+      <button class="export-link" id="exportBtn">⬇ Export all jobs as CSV</button>
     </div>
   </section>
 
@@ -238,23 +280,39 @@
   <button data-view="log" class="on"><span class="ic">✏️</span>Log</button>
   <button data-view="jobs"><span class="ic">📋</span>Jobs</button>
   <button data-view="stats"><span class="ic">📊</span>Stats</button>
-  <button data-view="settings"><span class="ic">⚙️</span>More</button>
 </nav>
 
 <div class="toast" id="toast"></div>
+
+<div class="modal" id="dupModal">
+  <div class="modal-card">
+    <h3 id="dupTitle">Customer already exists</h3>
+    <div class="sub" id="dupSub"></div>
+    <div id="dupOptions"></div>
+    <button class="btn grey" id="dupCancel" style="margin-top:4px;">Cancel</button>
+  </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 /* ---------- config ---------- */
 const JOB_TYPES = ["Service","Brakes","Clutch","Cambelt/Timing","Diagnostics","Suspension",
-  "Exhaust","Tyres","Battery/Electrical","Aircon","MOT repair","Engine","Welding","Other"];
-const LS_JOBS = "joblog.jobs.v3";
-const LS_SUPA = "joblog.supa.v1";
+  "Exhaust","Tyres","Battery/Electrical","Aircon","MOT repair","Engine","Welding"];
+const MAKES_SEED = ["Audi","BMW","Citroën","Dacia","Fiat","Ford","Honda","Hyundai","Jaguar","Kia",
+  "Land Rover","Lexus","Mazda","Mercedes-Benz","MG","MINI","Nissan","Peugeot","Renault","SEAT",
+  "Škoda","Suzuki","Tesla","Toyota","Vauxhall","Volkswagen","Volvo"];
+const MODELS_SEED = ["Fiesta","Focus","Corsa","Astra","Golf","Polo","Qashqai","Juke","Micra","Clio",
+  "208","308","3 Series","1 Series","A3","A4","Civic","Jazz","Yaris","Corolla","C-Class","A-Class",
+  "Sportage","Ceed","Ibiza","Leon","Octavia","Fabia","Mokka","Insignia","Tiguan","Passat","Transit","Berlingo"];
+const LS_JOBS="joblog.jobs.v3", LS_SUPA="joblog.supa.v1", LS_CUST="joblog.customers.v1",
+  LS_MAKES="joblog.makes.v1", LS_MODELS="joblog.models.v1", LS_TYPES="joblog.types.v1";
 const SUPA_DEFAULT = { url:"https://gvyvjfldvbwdiexjyxzh.supabase.co", key:"sb_publishable_qRVzjnqhCrUN6xxrKlWDtw_aSprTZ0T" };
 
 /* ---------- state ---------- */
 let jobs = load(LS_JOBS, []);
-let selType=null, comeback=false, editingId=null, viewDate=null;
+let customers = load(LS_CUST, []);
+let customMakes = load(LS_MAKES, []), customModels = load(LS_MODELS, []), customTypes = load(LS_TYPES, []);
+let selTypes=[], comeback=false, editingId=null, viewDate=null, selCustomerId=null, pending=null;
 let supa = load(LS_SUPA, SUPA_DEFAULT);
 if(!supa.url || !supa.key){ supa = SUPA_DEFAULT; save(LS_SUPA, supa); }
 let sb = null;
@@ -268,57 +326,154 @@ function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(
 function gbp(n){ return "£"+(Math.round(n*100)/100).toLocaleString(undefined,{maximumFractionDigits:2}); }
 function hrs(m){ return (Number(m)||0)/60; }
 function num(id){ return Number($("#"+id).value)||0; }
+function today(){ return new Date().toISOString().slice(0,10); }
+function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function uniqSort(a){ return [...new Set(a)].sort((x,y)=>x.localeCompare(y)); }
+function normReg(r){ return (r||"").toUpperCase().replace(/\s+/g,""); }
+function allMakes(){ return uniqSort([...MAKES_SEED,...customMakes]); }
+function allModels(){ return uniqSort([...MODELS_SEED,...customModels]); }
+function allJobTypes(){ return [...JOB_TYPES, ...customTypes.filter(t=>!JOB_TYPES.includes(t))]; }
 
+function jobTypesOf(j){ return (j.jobTypes&&j.jobTypes.length)?j.jobTypes:(j.jobType?[j.jobType]:["Other"]); }
+function typeLabel(j){ return jobTypesOf(j).join(" + "); }
 function jobTotal(j){ return (Number(j.labourCharged)||0)+(Number(j.partsCharged)||0); }
 function jobGP(j){ return jobTotal(j)-(Number(j.partsCost)||0); }
 function jobPartsProfit(j){ return (Number(j.partsCharged)||0)-(Number(j.partsCost)||0); }
 function jobGPH(j){ const h=hrs(j.actualMins); return h>0 ? jobGP(j)/h : null; }
 
-/* ---------- build chips ---------- */
+/* ---------- customers ---------- */
+function getCustomer(id){ return customers.find(c=>c.id===id); }
+function customersByName(name){ const n=(name||"").trim().toLowerCase(); return customers.filter(c=>c.name.trim().toLowerCase()===n); }
+function addCar(custId, car){ const c=getCustomer(custId); if(!c) return; if(!c.cars) c.cars=[];
+  if(car.reg && !c.cars.some(x=>normReg(x.reg)===normReg(car.reg))){ c.cars.push(car); save(LS_CUST,customers); }
+  else if(!car.reg && (car.make||car.model) && !c.cars.length){ c.cars.push(car); save(LS_CUST,customers); } }
+
+/* ---------- chips (multi-select job type) ---------- */
 function buildChips(){
-  const tc=$("#jobTypeChips");
-  JOB_TYPES.forEach(t=>{ const c=document.createElement("span"); c.className="chip"; c.textContent=t;
-    c.onclick=()=>{ selType=t; [...tc.children].forEach(x=>x.classList.remove("on")); c.classList.add("on"); }; tc.appendChild(c); });
+  const tc=$("#jobTypeChips"); tc.innerHTML="";
+  allJobTypes().forEach(t=>{
+    const c=document.createElement("span"); c.className="chip"+(selTypes.includes(t)?" on":""); c.textContent=t;
+    c.onclick=()=>{ const i=selTypes.indexOf(t); if(i>=0) selTypes.splice(i,1); else selTypes.push(t); c.classList.toggle("on"); };
+    tc.appendChild(c);
+  });
+  const other=document.createElement("span"); other.className="chip add"; other.textContent="+ Other";
+  other.onclick=()=>{ const v=prompt("What type of job?"); if(v && v.trim()){ const name=v.trim();
+    if(!allJobTypes().some(x=>x.toLowerCase()===name.toLowerCase())){ customTypes.push(name); save(LS_TYPES,customTypes); }
+    if(!selTypes.some(x=>x.toLowerCase()===name.toLowerCase())) selTypes.push(name);
+    buildChips(); } };
+  tc.appendChild(other);
 }
 function updateAge(){ const r=$("#ageRange"); const v=+r.value;
   $("#ageOut").textContent = v>=40 ? "40+ yrs" : v+(v===1?" yr":" yrs");
   r.style.setProperty("--fill", ((v-1)/39*100)+"%"); }
 
+/* ---------- combobox ---------- */
+function attachCombo(input, list, optionsFn, onPick, otherLabel){
+  function pick(v){ input.value=v; list.classList.remove("open"); if(onPick) onPick(v); }
+  function render(){
+    const q=input.value.trim().toLowerCase();
+    const opts=optionsFn();
+    const matches=(q?opts.filter(o=>o.toLowerCase().includes(q)):opts).slice(0,8);
+    list.innerHTML="";
+    const exact=opts.some(o=>o.toLowerCase()===q);
+    if(q && !exact){ const a=document.createElement("div"); a.className="add"; a.textContent='Add “'+input.value.trim()+'”'; a.onclick=()=>pick(input.value.trim()); list.appendChild(a); }
+    matches.forEach(o=>{ const d=document.createElement("div"); d.textContent=o; d.onclick=()=>pick(o); list.appendChild(d); });
+    if(otherLabel){ const o=document.createElement("div"); o.className="add"; o.textContent="Other…";
+      o.onclick=()=>{ const v=prompt("Add "+otherLabel+":"); if(v&&v.trim()) pick(v.trim()); }; list.appendChild(o); }
+    list.classList.toggle("open", list.children.length>0);
+  }
+  input.addEventListener("focus",render);
+  input.addEventListener("input",render);
+}
+function persistCustom(){
+  const mk=$("#make").value.trim(), md=$("#model").value.trim();
+  if(mk && !allMakes().some(x=>x.toLowerCase()===mk.toLowerCase())){ customMakes.push(mk); save(LS_MAKES,customMakes); }
+  if(md && !allModels().some(x=>x.toLowerCase()===md.toLowerCase())){ customModels.push(md); save(LS_MODELS,customModels); }
+}
+function renderCustomerCars(){
+  const box=$("#customerCars"); box.innerHTML="";
+  const c=getCustomer(selCustomerId); if(!c||!c.cars||!c.cars.length) return;
+  c.cars.forEach(car=>{ const chip=document.createElement("span"); chip.className="chip";
+    chip.textContent=(car.reg||"no reg")+(car.make?" · "+car.make+(car.model?" "+car.model:""):"");
+    chip.onclick=()=>{ $("#reg").value=car.reg||""; $("#make").value=car.make||""; $("#model").value=car.model||"";
+      [...box.children].forEach(x=>x.classList.remove("on")); chip.classList.add("on"); };
+    box.appendChild(chip); });
+  const nc=document.createElement("span"); nc.className="chip add"; nc.textContent="+ Other car";
+  nc.onclick=()=>{ $("#reg").value=""; $("#make").value=""; $("#model").value="";
+    [...box.children].forEach(x=>x.classList.remove("on")); nc.classList.add("on"); };
+  box.appendChild(nc);
+}
+function onPickCustomer(name){ const m=customersByName(name);
+  if(m.length===1){ selCustomerId=m[0].id; $("#phone").value=m[0].phone||""; renderCustomerCars(); } else { selCustomerId=null; $("#customerCars").innerHTML=""; } }
+
 /* ---------- save / edit / delete ---------- */
 function saveJob(){
-  if(!selType){ toast("Pick a job type"); return; }
+  if(!selTypes.length){ toast("Pick at least one job type"); return; }
   const mins = num("hrs")*60 + num("mins");
   if(mins<=0){ toast("How long did it take?"); return; }
-  const data={ date:$("#jobDate").value || new Date().toISOString().slice(0,10),
-    jobType:selType, actualMins:mins,
+  persistCustom();
+  pending={ date:$("#jobDate").value||today(),
+    jobTypes:selTypes.slice(), jobType:selTypes.join(" + "), actualMins:mins,
     labourCharged:num("labourCharged"), partsCharged:num("partsCharged"), partsCost:num("partsCost"),
     make:$("#make").value.trim(), model:$("#model").value.trim(), ageYears:+$("#ageRange").value,
-    quotedHours:(num("estHrs")*60+num("estMins"))/60, customer:$("#customer").value.trim(),
+    quotedHours:(num("estHrs")*60+num("estMins"))/60,
+    customer:$("#customer").value.trim(), reg:$("#reg").value.trim().toUpperCase(),
     notes:$("#notes").value.trim(), comeback:comeback };
-  const wasEditing = editingId;
-  if(editingId){
-    const j=jobs.find(x=>x.id===editingId);
-    if(j){ Object.assign(j, data); j.synced=false; if(sb) pushOne(j); }
-    toast("Updated ✓");
-  } else {
-    const j={ id:uid(), createdAt:new Date().toISOString(), ...data, synced:false };
-    jobs.unshift(j); if(sb) pushOne(j); toast("Saved ✓");
-  }
-  save(LS_JOBS,jobs); clearForm(); renderJobs(); renderStats();
+  resolveCustomerThenSave();
+}
+function resolveCustomerThenSave(){
+  const name=pending.customer;
+  if(!name){ commitSave(null); return; }
+  if(selCustomerId && getCustomer(selCustomerId)){ commitSave(selCustomerId); return; }
+  const matches=customersByName(name);
+  if(!matches.length){ commitSave(null, true); return; }
+  openDupModal(name, matches);
+}
+function commitSave(customerId, createNew){
+  const car={ reg:pending.reg, make:pending.make, model:pending.model };
+  const phone=$("#phone").value.trim();
+  if(createNew || (!customerId && pending.customer)){
+    const c={ id:uid(), name:pending.customer, phone:phone, createdAt:new Date().toISOString(), cars:(car.reg||car.make||car.model)?[car]:[] };
+    customers.push(c); customerId=c.id; save(LS_CUST,customers);
+  } else if(customerId){ const c=getCustomer(customerId); if(c){ if(phone) c.phone=phone; addCar(customerId, car); save(LS_CUST,customers); } }
+  if(sb && customerId) pushCustomer(getCustomer(customerId));
+  pending.customerId=customerId||"";
+  const wasEditing=editingId;
+  if(editingId){ const j=jobs.find(x=>x.id===editingId); if(j){ Object.assign(j,pending); j.synced=false; if(sb)pushOne(j); } toast("Updated ✓"); }
+  else{ const j={ id:uid(), createdAt:new Date().toISOString(), ...pending, synced:false }; jobs.unshift(j); if(sb)pushOne(j); toast("Saved ✓"); }
+  save(LS_JOBS,jobs); closeDupModal(); clearForm(); renderJobs(); renderStats();
   if(wasEditing) showView("jobs");
 }
+function openDupModal(name, matches){
+  $("#dupTitle").textContent='“'+name+'” already exists';
+  $("#dupSub").textContent="Same customer, or a different person with the same name?";
+  const box=$("#dupOptions"); box.innerHTML="";
+  matches.forEach(c=>{
+    const carsTxt=(c.cars&&c.cars.length)? c.cars.map(car=>(car.reg||"no reg")+(car.make?" "+car.make+(car.model?" "+car.model:""):"")).join(", ") : "no cars on record";
+    const d=document.createElement("div"); d.className="cust-opt";
+    d.innerHTML=`<div style="font-weight:700;">${esc(c.name)}</div><div class="cars">${esc(carsTxt)}</div>`;
+    const b=document.createElement("button"); b.className="btn blue"; b.textContent="Same customer (add this car if new)";
+    b.onclick=()=>commitSave(c.id); d.appendChild(b); box.appendChild(d);
+  });
+  const np=document.createElement("button"); np.className="btn grey"; np.textContent="Different person, same name";
+  np.onclick=()=>commitSave(null,true); box.appendChild(np);
+  $("#dupModal").classList.add("open");
+}
+function closeDupModal(){ $("#dupModal").classList.remove("open"); }
 function editJob(id){
   const j=jobs.find(x=>x.id===id); if(!j) return;
-  editingId=id; selType=j.jobType; comeback=!!j.comeback;
-  document.querySelectorAll("#jobTypeChips .chip").forEach(c=>c.classList.toggle("on", c.textContent===j.jobType));
-  $("#comebackChip").classList.toggle("on", comeback);
+  editingId=id; selTypes=jobTypesOf(j).slice(); comeback=!!j.comeback; selCustomerId=j.customerId||null;
+  buildChips(); $("#comebackChip").classList.toggle("on", comeback);
   $("#jobDate").value=j.date;
   $("#hrs").value=Math.floor(j.actualMins/60)||""; $("#mins").value=j.actualMins%60||"";
   $("#labourCharged").value=j.labourCharged||""; $("#partsCharged").value=j.partsCharged||""; $("#partsCost").value=j.partsCost||"";
+  $("#customer").value=j.customer||""; $("#reg").value=j.reg||"";
+  const lc=getCustomer(j.customerId); $("#phone").value=(lc&&lc.phone)?lc.phone:"";
   $("#make").value=j.make||""; $("#model").value=j.model||"";
   $("#ageRange").value=j.ageYears||10; updateAge();
   const qm=Math.round((j.quotedHours||0)*60); $("#estHrs").value=Math.floor(qm/60)||""; $("#estMins").value=qm%60||"";
-  $("#customer").value=j.customer||""; $("#notes").value=j.notes||"";
+  $("#notes").value=j.notes||"";
+  renderCustomerCars();
   $("#saveBtn").textContent="Update job"; $("#cancelBtn").style.display="flex"; $("#deleteBtn").style.display="flex";
   showView("log");
 }
@@ -331,23 +486,21 @@ function deleteJob(){
   clearForm(); toast("Deleted"); renderJobs(); renderStats(); showView("jobs");
 }
 function clearForm(){
-  selType=null; comeback=false; editingId=null;
-  ["hrs","mins","labourCharged","partsCharged","partsCost","make","model","estHrs","estMins","customer","notes"].forEach(id=>$("#"+id).value="");
-  $("#jobDate").value=new Date().toISOString().slice(0,10);
+  selTypes=[]; comeback=false; editingId=null; selCustomerId=null; pending=null;
+  ["hrs","mins","labourCharged","partsCharged","partsCost","make","model","estHrs","estMins","customer","phone","reg","notes"].forEach(id=>$("#"+id).value="");
+  $("#customerCars").innerHTML="";
+  $("#jobDate").value=today();
   $("#ageRange").value=10; updateAge(); $("#comebackChip").classList.remove("on");
-  document.querySelectorAll("#jobTypeChips .chip").forEach(x=>x.classList.remove("on"));
+  buildChips();
   $("#saveBtn").textContent="Save job"; $("#cancelBtn").style.display="none"; $("#deleteBtn").style.display="none";
   window.scrollTo({top:0,behavior:"smooth"});
 }
 
 /* ---------- jobs list (grouped by date) ---------- */
-function fmtDate(d){ const dt=new Date(d+"T00:00:00");
-  return isNaN(dt) ? d : dt.toLocaleDateString(undefined,{weekday:"short",day:"numeric",month:"short",year:"numeric"}); }
+function fmtDate(d){ const dt=new Date(d+"T00:00:00"); return isNaN(dt)?d:dt.toLocaleDateString(undefined,{weekday:"short",day:"numeric",month:"short",year:"numeric"}); }
 function renderJobs(){
   const list=$("#jobsList"); list.innerHTML="";
-  if(!jobs.length){ $("#jobsCount").textContent="No jobs yet"; $("#exportBtn").style.display="none";
-    list.innerHTML='<div class="empty">Log your first job and it shows up here.</div>'; return; }
-  $("#exportBtn").style.display="flex";
+  if(!jobs.length){ $("#jobsCount").textContent="No jobs yet"; list.innerHTML='<div class="empty">Log your first job and it shows up here.</div>'; return; }
   if(viewDate) renderDay(list); else renderDateList(list);
 }
 function renderDateList(list){
@@ -377,9 +530,9 @@ function renderDay(list){
     const under=j.quotedHours>0 && hrs(j.actualMins) > j.quotedHours*1.1;
     const d=document.createElement("div"); d.className="job"; d.style.cursor="pointer";
     d.innerHTML=`<div class="top">
-      <div><div class="ty">${j.jobType}</div>
-      <div class="meta">${veh||"—"}${j.ageYears?" · "+j.ageYears+"yr":""} · ${j.actualMins}min · ${gbp(jobTotal(j))}</div>
-      <div class="meta">${j.customer||""}</div></div>
+      <div><div class="ty">${esc(typeLabel(j))}</div>
+      <div class="meta">${esc(veh)||"—"}${j.reg?" · "+esc(j.reg):""} · ${j.actualMins}min · ${gbp(jobTotal(j))}</div>
+      <div class="meta">${esc(j.customer||"")}</div></div>
       <div class="gph">${gph!=null?gbp(gph)+"/h":"—"}</div></div>
       ${j.comeback?'<span class="pill cb">comeback</span>':''}${under?'<span class="pill under">over estimate</span>':''}
       <div class="meta" style="margin-top:9px; color:var(--accent2);">Tap to edit ›</div>`;
@@ -388,47 +541,49 @@ function renderDay(list){
   });
 }
 
-/* ---------- stats ---------- */
+/* ---------- stats (split multi-type jobs evenly) ---------- */
 function renderStats(){
   const sum=$("#statsSummary");
   if(!jobs.length){ sum.innerHTML='<div class="empty">No data yet. Stats appear after you log jobs.</div>';
     $("#statsByType").innerHTML=""; $("#statsQuote").innerHTML=""; return; }
   const tGP=jobs.reduce((a,j)=>a+jobGP(j),0), tH=jobs.reduce((a,j)=>a+hrs(j.actualMins),0);
   const tRev=jobs.reduce((a,j)=>a+jobTotal(j),0);
-  const tPartsProfit=jobs.reduce((a,j)=>a+jobPartsProfit(j),0);
-  const tLabour=jobs.reduce((a,j)=>a+(Number(j.labourCharged)||0),0);
+  const tPP=jobs.reduce((a,j)=>a+jobPartsProfit(j),0);
+  const tLab=jobs.reduce((a,j)=>a+(Number(j.labourCharged)||0),0);
   const avg=tH>0?tGP/tH:0, cb=jobs.filter(j=>j.comeback).length;
   sum.innerHTML=`
     <div class="stat"><span>Avg gross profit / hour</span><span class="v">${gbp(avg)}</span></div>
     <div class="stat"><span>Total gross profit</span><span class="v">${gbp(tGP)}</span></div>
-    <div class="stat"><span>&nbsp;&nbsp;↳ from labour</span><span class="v">${gbp(tLabour)}</span></div>
-    <div class="stat"><span>&nbsp;&nbsp;↳ from parts markup</span><span class="v">${gbp(tPartsProfit)}</span></div>
+    <div class="stat"><span>&nbsp;&nbsp;↳ from labour</span><span class="v">${gbp(tLab)}</span></div>
+    <div class="stat"><span>&nbsp;&nbsp;↳ from parts markup</span><span class="v">${gbp(tPP)}</span></div>
     <div class="stat"><span>Total charged</span><span class="v">${gbp(tRev)}</span></div>
     <div class="stat"><span>Hours on the tools</span><span class="v">${tH.toFixed(1)}h</span></div>
     <div class="stat"><span>Comebacks</span><span class="v">${cb}</span></div>`;
   const byType={};
-  jobs.forEach(j=>{ const t=j.jobType; (byType[t]=byType[t]||{gp:0,h:0,n:0}); byType[t].gp+=jobGP(j); byType[t].h+=hrs(j.actualMins); byType[t].n++; });
+  jobs.forEach(j=>{ const ts=jobTypesOf(j); const n=ts.length; const gpE=jobGP(j)/n, hE=hrs(j.actualMins)/n;
+    ts.forEach(t=>{ (byType[t]=byType[t]||{gp:0,h:0,n:0}); byType[t].gp+=gpE; byType[t].h+=hE; byType[t].n++; }); });
   const rows=Object.entries(byType).map(([t,v])=>({t,gph:v.h>0?v.gp/v.h:0,n:v.n})).sort((a,b)=>b.gph-a.gph);
   const max=Math.max(...rows.map(r=>r.gph),1);
-  $("#statsByType").innerHTML=rows.map(r=>`<div class="barRow"><div class="h"><span>${r.t} <span class="muted">(${r.n})</span></span><span>${gbp(r.gph)}/h</span></div><div class="bar"><span style="width:${Math.max(4,r.gph/max*100)}%"></span></div></div>`).join("");
+  $("#statsByType").innerHTML=rows.map(r=>`<div class="barRow"><div class="h"><span>${esc(r.t)} <span class="muted">(${r.n})</span></span><span>${gbp(r.gph)}/h</span></div><div class="bar"><span style="width:${Math.max(4,r.gph/max*100)}%"></span></div></div>`).join("");
   const q=jobs.filter(j=>j.quotedHours>0);
   if(!q.length){ $("#statsQuote").innerHTML='<div class="muted">Add "estimated at start" to jobs to see where you under-estimate.</div>'; return; }
-  const qt={}; q.forEach(j=>{ const t=j.jobType; (qt[t]=qt[t]||{q:0,a:0,n:0}); qt[t].q+=j.quotedHours; qt[t].a+=hrs(j.actualMins); qt[t].n++; });
-  const qr=Object.entries(qt).map(([t,v])=>({t,ratio:v.a/v.q,n:v.n})).sort((a,b)=>b.ratio-a.ratio);
+  const qt={}; q.forEach(j=>{ const ts=jobTypesOf(j); const n=ts.length;
+    ts.forEach(t=>{ (qt[t]=qt[t]||{q:0,a:0,n:0}); qt[t].q+=j.quotedHours/n; qt[t].a+=hrs(j.actualMins)/n; qt[t].n++; }); });
+  const qr=Object.entries(qt).map(([t,v])=>({t,ratio:v.q>0?v.a/v.q:1,n:v.n})).sort((a,b)=>b.ratio-a.ratio);
   $("#statsQuote").innerHTML=qr.map(r=>{ const pct=Math.round((r.ratio-1)*100); const over=pct>10;
-    return `<div class="stat"><span>${r.t} <span class="muted">(${r.n})</span></span><span class="v" style="color:${over?'var(--warn)':'var(--accent)'}">${pct>0?"+":""}${pct}%</span></div>`;
+    return `<div class="stat"><span>${esc(r.t)} <span class="muted">(${r.n})</span></span><span class="v" style="color:${over?'var(--warn)':'var(--accent)'}">${pct>0?"+":""}${pct}%</span></div>`;
   }).join("")+'<small class="hint">+ = the job takes longer than you estimated. These are where you are quietly losing money.</small>';
 }
 
 /* ---------- export ---------- */
 function exportCSV(){
   if(!jobs.length){ toast("No jobs to export"); return; }
-  const cols=["date","jobType","make","model","ageYears","actualMins","quotedHours","labourCharged","partsCharged","partsCost","totalCharged","grossProfit","customer","comeback","notes","createdAt"];
-  const esc=v=>{ v=(v==null?"":String(v)); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
-  const rowOut=j=>({ ...j, totalCharged:jobTotal(j), grossProfit:jobGP(j) });
-  const csv=cols.join(",")+"\n"+jobs.map(j=>{ const r=rowOut(j); return cols.map(c=>esc(r[c])).join(","); }).join("\n");
+  const cols=["date","jobType","customer","phone","reg","make","model","ageYears","actualMins","quotedHours","labourCharged","partsCharged","partsCost","totalCharged","grossProfit","comeback","notes","customer_id","createdAt"];
+  const escc=v=>{ v=(v==null?"":String(v)); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
+  const rowOut=j=>{ const c=getCustomer(j.customerId); return { ...j, jobType:typeLabel(j), phone:c?c.phone:"", totalCharged:jobTotal(j), grossProfit:jobGP(j), customer_id:j.customerId }; };
+  const csv=cols.join(",")+"\n"+jobs.map(j=>{ const r=rowOut(j); return cols.map(c=>escc(r[c])).join(","); }).join("\n");
   const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
-  a.download="joblog-"+new Date().toISOString().slice(0,10)+".csv"; a.click(); toast("CSV exported");
+  a.download="joblog-"+today()+".csv"; a.click(); toast("CSV exported");
 }
 
 /* ---------- supabase ---------- */
@@ -439,18 +594,25 @@ function initSupa(){
     catch(e){ sb=null; $("#supaStatus").textContent="Could not connect: "+e.message; }
   }
 }
-function rowFor(j){ return { id:j.id, created_at:j.createdAt, job_date:j.date, job_type:j.jobType, make:j.make,
-  model:j.model, age_years:j.ageYears, actual_mins:j.actualMins, quoted_hours:j.quotedHours,
+function rowFor(j){ return { id:j.id, created_at:j.createdAt, job_date:j.date, job_type:typeLabel(j), make:j.make,
+  model:j.model, reg:j.reg, customer_id:j.customerId, age_years:j.ageYears, actual_mins:j.actualMins, quoted_hours:j.quotedHours,
   labour_charged:j.labourCharged, parts_charged:j.partsCharged, parts_cost:j.partsCost,
   total_charged:jobTotal(j), customer:j.customer, notes:j.notes, comeback:j.comeback }; }
 async function pushOne(j){ if(!sb) return; try{ const {error}=await sb.from("jobs").upsert(rowFor(j)); if(!error){ j.synced=true; save(LS_JOBS,jobs); } }catch(e){} }
+function custRow(c){ return { id:c.id, name:c.name, phone:c.phone||"", cars:c.cars||[],
+  created_at:c.createdAt||new Date().toISOString(), updated_at:new Date().toISOString() }; }
+async function pushCustomer(c){ if(!sb||!c) return; try{ await sb.from("customers").upsert(custRow(c)); }catch(e){} }
 async function syncAll(){
   if(!sb){ toast("Add Supabase details first"); return; }
-  const p=jobs.filter(j=>!j.synced); if(!p.length){ toast("Already synced"); return; }
-  try{ const {error}=await sb.from("jobs").upsert(p.map(rowFor));
-    if(error){ toast("Sync failed"); $("#supaStatus").textContent=error.message; return; }
-    p.forEach(j=>j.synced=true); save(LS_JOBS,jobs); toast("Synced "+p.length+" jobs"); }
-  catch(e){ toast("Sync failed"); $("#supaStatus").textContent=e.message; }
+  const p=jobs.filter(j=>!j.synced);
+  try{
+    if(customers.length){ const {error:ce}=await sb.from("customers").upsert(customers.map(custRow));
+      if(ce){ toast("Customer sync failed"); $("#supaStatus").textContent=ce.message; return; } }
+    if(p.length){ const {error}=await sb.from("jobs").upsert(p.map(rowFor));
+      if(error){ toast("Sync failed"); $("#supaStatus").textContent=error.message; return; }
+      p.forEach(j=>j.synced=true); save(LS_JOBS,jobs); }
+    toast(p.length? "Synced "+p.length+" jobs + "+customers.length+" customers" : "Customers synced");
+  }catch(e){ toast("Sync failed"); $("#supaStatus").textContent=e.message; }
 }
 
 /* ---------- nav ---------- */
@@ -463,23 +625,28 @@ function showView(v){
 
 /* ---------- wire ---------- */
 buildChips(); updateAge();
+attachCombo($("#make"), $("#makeList"), allMakes, null, "make");
+attachCombo($("#model"), $("#modelList"), allModels, null, "model");
+attachCombo($("#customer"), $("#customerList"), ()=>uniqSort(customers.map(c=>c.name)), onPickCustomer, null);
+$("#customer").addEventListener("input", ()=>{ const c=getCustomer(selCustomerId);
+  if(!c || c.name.toLowerCase()!==$("#customer").value.trim().toLowerCase()){ selCustomerId=null; $("#customerCars").innerHTML=""; } });
+$("#reg").addEventListener("input", function(){ const p=this.selectionStart; this.value=this.value.toUpperCase(); this.setSelectionRange&&this.setSelectionRange(p,p); });
 $("#ageRange").addEventListener("input", updateAge);
 $("#saveBtn").onclick=saveJob;
 $("#cancelBtn").onclick=function(){ clearForm(); showView("jobs"); };
 $("#deleteBtn").onclick=deleteJob;
+$("#dupCancel").onclick=closeDupModal;
 $("#comebackChip").onclick=function(){ comeback=!comeback; this.classList.toggle("on",comeback); };
-$("#exportBtn").onclick=exportCSV; $("#exportBtn2").onclick=exportCSV;
-$("#wipeBtn").onclick=function(){ if(confirm("Delete ALL jobs on this phone? Cannot be undone.")){ jobs=[]; save(LS_JOBS,jobs); renderJobs(); renderStats(); toast("All jobs deleted"); } };
+$("#exportBtn").onclick=exportCSV;
+$("#cogBtn").onclick=function(){ showView("settings"); };
+$("#settingsBack").onclick=function(){ showView("log"); };
 $("#saveSupaBtn").onclick=function(){ supa={url:$("#supaUrl").value.trim(),key:$("#supaKey").value.trim()}; save(LS_SUPA,supa); initSupa(); toast("Saved"); };
 $("#syncBtn").onclick=syncAll;
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{
-  const v=b.dataset.view;
-  if(v!=="log" && editingId) clearForm();
-  if(v==="jobs") viewDate=null;
-  showView(v);
-});
+  const v=b.dataset.view; if(v!=="log" && editingId) clearForm(); if(v==="jobs") viewDate=null; showView(v); });
+document.addEventListener("click",e=>{ if(!e.target.closest(".combo")) document.querySelectorAll(".combo-list").forEach(l=>l.classList.remove("open")); });
 $("#supaUrl").value=supa.url||""; $("#supaKey").value=supa.key||"";
-$("#jobDate").value=new Date().toISOString().slice(0,10);
+$("#jobDate").value=today();
 window.addEventListener("load", initSupa);
 renderJobs(); renderStats();
 </script>
