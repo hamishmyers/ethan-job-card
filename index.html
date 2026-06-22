@@ -258,15 +258,11 @@
     <button class="btn grey" id="settingsBack" style="margin-bottom:14px;">‹ Back</button>
     <h1>Settings</h1>
     <div class="card">
-      <div style="font-weight:700; margin-bottom:4px;">Cloud sync</div>
-      <div class="muted" style="font-size:.85rem;">Your jobs back up to Supabase automatically. Leave blank to keep everything on this phone only.</div>
-      <label>Supabase URL</label>
-      <input id="supaUrl" placeholder="https://xxxx.supabase.co" autocomplete="off" />
-      <label>Supabase key</label>
-      <input id="supaKey" placeholder="sb_publishable_…" autocomplete="off" />
-      <button class="btn blue" id="saveSupaBtn" style="margin-top:14px;">Save &amp; connect</button>
-      <button class="btn grey" id="syncBtn">Sync now</button>
-      <small class="hint" id="supaStatus"></small>
+      <div style="display:flex; align-items:center; justify-content:space-between;">
+        <div style="font-weight:700;">Cloud backup</div>
+        <span id="cloudBadge2" class="cloud">local</span>
+      </div>
+      <div class="muted" style="font-size:.85rem; margin-top:6px;">Everything you log saves to the cloud automatically, the moment you add or change it. Nothing to set up.</div>
     </div>
     <div class="card">
       <div style="font-weight:700; margin-bottom:6px;">Data</div>
@@ -290,6 +286,16 @@
     <div class="sub" id="dupSub"></div>
     <div id="dupOptions"></div>
     <button class="btn grey" id="dupCancel" style="margin-top:4px;">Cancel</button>
+  </div>
+</div>
+
+<div class="modal" id="askModal">
+  <div class="modal-card">
+    <h3 id="askTitle"></h3>
+    <div class="sub" id="askSub" style="display:none;"></div>
+    <input id="askInput" style="display:none; margin-bottom:14px;" autocomplete="off" />
+    <button class="btn green" id="askOk">OK</button>
+    <button class="btn grey" id="askCancel">Cancel</button>
   </div>
 </div>
 
@@ -357,10 +363,10 @@ function buildChips(){
     tc.appendChild(c);
   });
   const other=document.createElement("span"); other.className="chip add"; other.textContent="+ Other";
-  other.onclick=()=>{ const v=prompt("What type of job?"); if(v && v.trim()){ const name=v.trim();
+  other.onclick=()=>{ showPrompt("Add a job type","e.g. Air-con regas",(name)=>{
     if(!allJobTypes().some(x=>x.toLowerCase()===name.toLowerCase())){ customTypes.push(name); save(LS_TYPES,customTypes); }
     if(!selTypes.some(x=>x.toLowerCase()===name.toLowerCase())) selTypes.push(name);
-    buildChips(); } };
+    buildChips(); }); };
   tc.appendChild(other);
 }
 function updateAge(){ const r=$("#ageRange"); const v=+r.value;
@@ -379,7 +385,7 @@ function attachCombo(input, list, optionsFn, onPick, otherLabel){
     if(q && !exact){ const a=document.createElement("div"); a.className="add"; a.textContent='Add “'+input.value.trim()+'”'; a.onclick=()=>pick(input.value.trim()); list.appendChild(a); }
     matches.forEach(o=>{ const d=document.createElement("div"); d.textContent=o; d.onclick=()=>pick(o); list.appendChild(d); });
     if(otherLabel){ const o=document.createElement("div"); o.className="add"; o.textContent="Other…";
-      o.onclick=()=>{ const v=prompt("Add "+otherLabel+":"); if(v&&v.trim()) pick(v.trim()); }; list.appendChild(o); }
+      o.onclick=()=>{ showPrompt("Add a "+otherLabel,"Type the "+otherLabel,(v)=>pick(v)); }; list.appendChild(o); }
     list.classList.toggle("open", list.children.length>0);
   }
   input.addEventListener("focus",render);
@@ -460,6 +466,23 @@ function openDupModal(name, matches){
   $("#dupModal").classList.add("open");
 }
 function closeDupModal(){ $("#dupModal").classList.remove("open"); }
+let askCb=null;
+function showPrompt(title, ph, cb){
+  $("#askTitle").textContent=title; $("#askSub").style.display="none";
+  const i=$("#askInput"); i.style.display="block"; i.value=""; i.placeholder=ph||"";
+  $("#askOk").textContent="Add"; $("#askOk").className="btn green";
+  askCb=(ok)=>{ const v=i.value.trim(); closeAsk(); if(ok&&v&&cb) cb(v); };
+  $("#askModal").classList.add("open"); setTimeout(()=>i.focus(),60);
+}
+function showConfirm(title, msg, cb){
+  $("#askTitle").textContent=title; const s=$("#askSub");
+  if(msg){ s.textContent=msg; s.style.display="block"; } else s.style.display="none";
+  $("#askInput").style.display="none";
+  $("#askOk").textContent="Delete"; $("#askOk").className="btn red";
+  askCb=(ok)=>{ closeAsk(); if(ok&&cb) cb(); };
+  $("#askModal").classList.add("open");
+}
+function closeAsk(){ $("#askModal").classList.remove("open"); askCb=null; }
 function editJob(id){
   const j=jobs.find(x=>x.id===id); if(!j) return;
   editingId=id; selTypes=jobTypesOf(j).slice(); comeback=!!j.comeback; selCustomerId=j.customerId||null;
@@ -479,11 +502,12 @@ function editJob(id){
 }
 function deleteJob(){
   if(!editingId) return;
-  if(!confirm("Delete this job? This cannot be undone.")) return;
   const id=editingId;
-  jobs=jobs.filter(x=>x.id!==id); save(LS_JOBS,jobs);
-  if(sb){ sb.from("jobs").delete().eq("id",id).then(()=>{}); }
-  clearForm(); toast("Deleted"); renderJobs(); renderStats(); showView("jobs");
+  showConfirm("Delete this job?","This can't be undone.",()=>{
+    jobs=jobs.filter(x=>x.id!==id); save(LS_JOBS,jobs);
+    if(sb){ sb.from("jobs").delete().eq("id",id).then(()=>{}); }
+    clearForm(); toast("Deleted"); renderJobs(); renderStats(); showView("jobs");
+  });
 }
 function clearForm(){
   selTypes=[]; comeback=false; editingId=null; selCustomerId=null; pending=null;
@@ -587,12 +611,17 @@ function exportCSV(){
 }
 
 /* ---------- supabase ---------- */
+function setCloudBadge(on){ document.querySelectorAll("#cloudBadge,#cloudBadge2").forEach(b=>{ b.textContent=on?"cloud":"local"; b.classList.toggle("on",on); }); }
 function initSupa(){
   if(supa.url && supa.key && window.supabase){
-    try{ sb=window.supabase.createClient(supa.url,supa.key);
-      $("#cloudBadge").textContent="cloud"; $("#cloudBadge").classList.add("on"); $("#supaStatus").textContent="Connected."; }
-    catch(e){ sb=null; $("#supaStatus").textContent="Could not connect: "+e.message; }
+    try{ sb=window.supabase.createClient(supa.url,supa.key); setCloudBadge(true); flushUnsynced(); }
+    catch(e){ sb=null; setCloudBadge(false); }
   }
+}
+function flushUnsynced(){
+  if(!sb) return;
+  customers.forEach(c=>pushCustomer(c));
+  jobs.filter(j=>!j.synced).forEach(j=>pushOne(j));
 }
 function rowFor(j){ return { id:j.id, created_at:j.createdAt, job_date:j.date, job_type:typeLabel(j), make:j.make,
   model:j.model, reg:j.reg, customer_id:j.customerId, age_years:j.ageYears, actual_mins:j.actualMins, quoted_hours:j.quotedHours,
@@ -602,18 +631,6 @@ async function pushOne(j){ if(!sb) return; try{ const {error}=await sb.from("job
 function custRow(c){ return { id:c.id, name:c.name, phone:c.phone||"", cars:c.cars||[],
   created_at:c.createdAt||new Date().toISOString(), updated_at:new Date().toISOString() }; }
 async function pushCustomer(c){ if(!sb||!c) return; try{ await sb.from("customers").upsert(custRow(c)); }catch(e){} }
-async function syncAll(){
-  if(!sb){ toast("Add Supabase details first"); return; }
-  const p=jobs.filter(j=>!j.synced);
-  try{
-    if(customers.length){ const {error:ce}=await sb.from("customers").upsert(customers.map(custRow));
-      if(ce){ toast("Customer sync failed"); $("#supaStatus").textContent=ce.message; return; } }
-    if(p.length){ const {error}=await sb.from("jobs").upsert(p.map(rowFor));
-      if(error){ toast("Sync failed"); $("#supaStatus").textContent=error.message; return; }
-      p.forEach(j=>j.synced=true); save(LS_JOBS,jobs); }
-    toast(p.length? "Synced "+p.length+" jobs + "+customers.length+" customers" : "Customers synced");
-  }catch(e){ toast("Sync failed"); $("#supaStatus").textContent=e.message; }
-}
 
 /* ---------- nav ---------- */
 function showView(v){
@@ -636,16 +653,16 @@ $("#saveBtn").onclick=saveJob;
 $("#cancelBtn").onclick=function(){ clearForm(); showView("jobs"); };
 $("#deleteBtn").onclick=deleteJob;
 $("#dupCancel").onclick=closeDupModal;
+$("#askOk").onclick=()=>askCb&&askCb(true);
+$("#askCancel").onclick=()=>askCb&&askCb(false);
+$("#askInput").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); askCb&&askCb(true); } });
 $("#comebackChip").onclick=function(){ comeback=!comeback; this.classList.toggle("on",comeback); };
 $("#exportBtn").onclick=exportCSV;
 $("#cogBtn").onclick=function(){ showView("settings"); };
 $("#settingsBack").onclick=function(){ showView("log"); };
-$("#saveSupaBtn").onclick=function(){ supa={url:$("#supaUrl").value.trim(),key:$("#supaKey").value.trim()}; save(LS_SUPA,supa); initSupa(); toast("Saved"); };
-$("#syncBtn").onclick=syncAll;
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{
   const v=b.dataset.view; if(v!=="log" && editingId) clearForm(); if(v==="jobs") viewDate=null; showView(v); });
 document.addEventListener("click",e=>{ if(!e.target.closest(".combo")) document.querySelectorAll(".combo-list").forEach(l=>l.classList.remove("open")); });
-$("#supaUrl").value=supa.url||""; $("#supaKey").value=supa.key||"";
 $("#jobDate").value=today();
 window.addEventListener("load", initSupa);
 renderJobs(); renderStats();
