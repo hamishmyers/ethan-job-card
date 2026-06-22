@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0b1120" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Job Log" />
+<title>Job Log</title>
+<style>
+  :root{
+    --bg:#0b1120; --bg2:#0e1730;
+    --card:rgba(30,41,59,.72); --card2:#222f45; --line:rgba(148,163,184,.16); --line2:rgba(148,163,184,.28);
+    --txt:#f1f5f9; --muted:#9aa7bd; --accent:#22c55e; --accent-d:#16a34a; --accent2:#3b82f6; --accent2-d:#2563eb;
+    --warn:#fbbf24; --danger:#f43f5e; --radius:18px;
+    --safe-b: env(safe-area-inset-bottom, 0px);
+    --shadow:0 10px 30px -12px rgba(0,0,0,.6);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html{ -webkit-text-size-adjust:100%; }
+  body{margin:0; color:var(--txt);
+    background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(59,130,246,.18), transparent 60%),
+      radial-gradient(900px 500px at -10% 0%, rgba(34,197,94,.12), transparent 55%),
+      linear-gradient(180deg,var(--bg2),var(--bg));
+    background-attachment:fixed;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-size:17px; line-height:1.4; letter-spacing:-.01em; overscroll-behavior-y:contain;
+    padding: max(env(safe-area-inset-top,0px), 10px) 0 calc(88px + var(--safe-b));}
+  .wrap{max-width:600px; margin:0 auto; padding:8px 16px;}
+  section{animation:fade .35s ease both;}
+  @keyframes fade{from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:none;}}
+  @media (prefers-reduced-motion:reduce){*{animation:none !important; transition:none !important;}}
+  h1{font-size:1.55rem; font-weight:800; margin:2px 0; letter-spacing:-.02em;}
+  .sub{color:var(--muted); font-size:.88rem; margin-bottom:14px;}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    padding:18px; margin-bottom:14px; box-shadow:var(--shadow); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);}
+  label{display:block; font-size:.72rem; color:var(--muted); margin:18px 0 9px; text-transform:uppercase; letter-spacing:.07em; font-weight:700;}
+  label:first-child{margin-top:0;}
+  label .opt{color:#64748b; font-weight:600; text-transform:none; letter-spacing:0;}
+  input,select,textarea{width:100%; background:var(--card2); color:var(--txt); border:1px solid var(--line2);
+    border-radius:13px; padding:15px 14px; font-size:16px; outline:none; appearance:none; -webkit-appearance:none;
+    transition:border-color .15s, box-shadow .15s;}
+  input::placeholder,textarea::placeholder{color:#64748b;}
+  input[type=date]::-webkit-calendar-picker-indicator{filter:invert(.85); cursor:pointer;}
+  input[type=date]{min-height:52px;}
+  input:focus,select:focus,textarea:focus{border-color:var(--accent2); box-shadow:0 0 0 4px rgba(59,130,246,.18);}
+  textarea{line-height:1.45;}
+  .row{display:flex; gap:10px;} .row > *{flex:1; min-width:0;}
+  .affix{position:relative;}
+  .affix > span{position:absolute; left:14px; top:50%; transform:translateY(-50%); color:var(--muted); font-size:16px; pointer-events:none;}
+  .affix > input{padding-left:30px;}
+  .unit{position:relative;}
+  .unit > b{position:absolute; right:14px; top:50%; transform:translateY(-50%); color:var(--muted); font-size:.8rem; font-weight:700; pointer-events:none;}
+  .chips{display:flex; flex-wrap:wrap; gap:9px;}
+  .chip{padding:13px 16px; border-radius:13px; background:var(--card2); border:1px solid var(--line2);
+    font-size:.98rem; color:var(--txt); cursor:pointer; user-select:none; flex:0 0 auto; min-height:48px;
+    display:flex; align-items:center; transition:transform .12s, background .15s, border-color .15s, box-shadow .15s;}
+  .chip:active{transform:scale(.95);}
+  .chip.on{background:linear-gradient(180deg,var(--accent2),var(--accent2-d)); border-color:transparent;
+    color:#fff; font-weight:700; box-shadow:0 6px 16px -6px rgba(59,130,246,.7);}
+  .chip.cb.on{background:linear-gradient(180deg,var(--danger),#e11d48); box-shadow:0 6px 16px -6px rgba(244,63,94,.7);}
+  /* range slider */
+  .slider{display:flex; align-items:center; gap:14px;}
+  .slider output{min-width:78px; text-align:right; font-weight:800; font-size:1.05rem; white-space:nowrap;}
+  input[type=range]{-webkit-appearance:none; appearance:none; width:100%; height:8px; padding:0; border:none;
+    border-radius:999px; background:linear-gradient(90deg,var(--accent2) var(--fill,25%), rgba(148,163,184,.2) var(--fill,25%));}
+  input[type=range]:focus{box-shadow:none;}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:28px; height:28px; border-radius:50%;
+    background:#fff; border:3px solid var(--accent2); box-shadow:0 3px 8px rgba(0,0,0,.4); cursor:pointer;}
+  input[type=range]::-moz-range-thumb{width:28px; height:28px; border-radius:50%; background:#fff;
+    border:3px solid var(--accent2); box-shadow:0 3px 8px rgba(0,0,0,.4); cursor:pointer;}
+  .btn{display:flex; align-items:center; justify-content:center; width:100%; border:none; border-radius:15px;
+    padding:18px; font-size:1.08rem; font-weight:800; color:#fff; cursor:pointer; min-height:58px; letter-spacing:.01em;
+    transition:transform .12s, filter .15s, box-shadow .15s;}
+  .btn.green{background:linear-gradient(180deg,var(--accent),var(--accent-d)); color:#042713; box-shadow:0 10px 24px -10px rgba(34,197,94,.8);}
+  .btn.blue{background:linear-gradient(180deg,var(--accent2),var(--accent2-d)); box-shadow:0 10px 24px -10px rgba(59,130,246,.7);}
+  .btn.grey{background:#334155; box-shadow:none;}
+  .btn.red{background:linear-gradient(180deg,var(--danger),#e11d48);}
+  .btn:active{transform:scale(.985); filter:brightness(1.05);}
+  .btn + .btn{margin-top:10px;}
+  .divider{display:flex; align-items:center; gap:12px; margin:22px 0 4px; color:var(--muted); font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em;}
+  .divider::before,.divider::after{content:""; flex:1; height:1px; background:var(--line);}
+  nav{position:fixed; left:0; right:0; bottom:0; display:flex; padding-bottom:var(--safe-b); z-index:50;
+    background:rgba(11,17,32,.78); border-top:1px solid var(--line); backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px);}
+  nav button{position:relative; flex:1; background:none; border:none; color:var(--muted); font-size:.68rem; font-weight:700;
+    padding:11px 4px 9px; cursor:pointer; transition:color .15s;}
+  nav button .ic{display:block; font-size:1.4rem; margin-bottom:3px; line-height:1; filter:grayscale(.4); transition:filter .15s, transform .15s;}
+  nav button.on{color:var(--accent);}
+  nav button.on .ic{filter:none; transform:translateY(-1px) scale(1.08);}
+  nav button.on::after{content:""; position:absolute; top:0; left:50%; transform:translateX(-50%);
+    width:30px; height:3px; border-radius:0 0 4px 4px; background:var(--accent);}
+  .job{background:var(--card); border:1px solid var(--line); border-radius:15px; padding:15px; margin-bottom:11px;
+    box-shadow:var(--shadow); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); animation:fade .3s ease both;}
+  .job .top{display:flex; justify-content:space-between; align-items:flex-start; gap:10px;}
+  .job .ty{font-weight:700; font-size:1.04rem;}
+  .job .meta{color:var(--muted); font-size:.82rem; margin-top:4px;}
+  .job .gph{font-weight:800; font-size:1.12rem; white-space:nowrap; text-align:right; color:var(--accent);}
+  .pill{display:inline-block; font-size:.68rem; font-weight:700; padding:4px 10px; border-radius:999px; margin-top:9px; margin-right:6px; letter-spacing:.02em;}
+  .pill.cb{background:rgba(244,63,94,.18); color:#fda4af;}
+  .pill.under{background:rgba(251,191,36,.18); color:var(--warn);}
+  .stat{display:flex; justify-content:space-between; align-items:center; padding:13px 0; border-bottom:1px solid var(--line);}
+  .stat:first-child{padding-top:0;}
+  .stat:last-child{border-bottom:none; padding-bottom:0;} .stat .v{font-weight:800; font-size:1.05rem;}
+  .barRow{margin:15px 0;}
+  .barRow:last-child{margin-bottom:2px;}
+  .barRow .h{display:flex; justify-content:space-between; font-size:.92rem; margin-bottom:6px;}
+  .bar{height:12px; background:rgba(148,163,184,.14); border-radius:999px; overflow:hidden;}
+  .bar > span{display:block; height:100%; border-radius:999px;
+    background:linear-gradient(90deg,var(--accent2),var(--accent)); transition:width .5s cubic-bezier(.2,.8,.2,1);}
+  .muted{color:var(--muted);} .empty{color:var(--muted); text-align:center; padding:48px 12px; font-size:.95rem;}
+  .toast{position:fixed; left:50%; bottom:calc(98px + var(--safe-b)); transform:translateX(-50%) translateY(10px);
+    background:linear-gradient(180deg,var(--accent),var(--accent-d)); color:#042713; font-weight:800; padding:13px 24px;
+    border-radius:999px; opacity:0; pointer-events:none; transition:opacity .25s, transform .25s; z-index:80; box-shadow:0 12px 30px -8px rgba(0,0,0,.6);}
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+  .cloud{font-size:.66rem; font-weight:700; padding:4px 10px; border-radius:999px; background:var(--card2); color:var(--muted);
+    border:1px solid var(--line2); letter-spacing:.04em; text-transform:uppercase;}
+  .cloud.on{color:var(--accent); border-color:rgba(34,197,94,.4); background:rgba(34,197,94,.12);}
+  small.hint{display:block; color:var(--muted); font-size:.78rem; margin-top:10px; line-height:1.45;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- LOG -->
+  <section id="view-log">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div><h1>Log a job</h1><div class="sub">Fill it in when the job's done</div></div>
+      <span id="cloudBadge" class="cloud">local</span>
+    </div>
+
+    <div class="card">
+      <label>Job type</label>
+      <div class="chips" id="jobTypeChips"></div>
+
+      <label>Time spent</label>
+      <div class="row">
+        <div class="unit"><input id="hrs" type="number" inputmode="numeric" min="0" placeholder="0" /><b>hrs</b></div>
+        <div class="unit"><input id="mins" type="number" inputmode="numeric" min="0" max="59" placeholder="0" /><b>min</b></div>
+      </div>
+
+      <label>Labour charged</label>
+      <div class="affix"><span>£</span><input id="labourCharged" type="number" inputmode="decimal" placeholder="0" /></div>
+
+      <label>Parts charged <span class="opt">(what the customer pays for parts)</span></label>
+      <div class="affix"><span>£</span><input id="partsCharged" type="number" inputmode="decimal" placeholder="0" /></div>
+
+      <label>Parts cost <span class="opt">(what you paid)</span></label>
+      <div class="affix"><span>£</span><input id="partsCost" type="number" inputmode="decimal" placeholder="0" /></div>
+
+      <div class="divider">Optional</div>
+
+      <label>Date <span class="opt">(defaults to today, change to back-date)</span></label>
+      <input id="jobDate" type="date" />
+
+      <label>Vehicle <span class="opt">(make &amp; model)</span></label>
+      <div class="row">
+        <input id="make" placeholder="Make" autocomplete="off" />
+        <input id="model" placeholder="Model" autocomplete="off" />
+      </div>
+
+      <label>Vehicle age</label>
+      <div class="slider">
+        <input id="ageRange" type="range" min="1" max="40" value="10" />
+        <output id="ageOut">10 yrs</output>
+      </div>
+
+      <label>Estimated at start <span class="opt">(your guess before the job)</span></label>
+      <div class="row">
+        <div class="unit"><input id="estHrs" type="number" inputmode="numeric" min="0" placeholder="0" /><b>hrs</b></div>
+        <div class="unit"><input id="estMins" type="number" inputmode="numeric" min="0" max="59" placeholder="0" /><b>min</b></div>
+      </div>
+
+      <label>Customer <span class="opt">(name or reg)</span></label>
+      <input id="customer" placeholder="e.g. John / AB12 CDE" autocomplete="off" />
+
+      <label>Notes</label>
+      <textarea id="notes" rows="2" placeholder="Anything worth remembering"></textarea>
+
+      <label>Flag</label>
+      <div class="chips"><span class="chip cb" id="comebackChip">⚠ Comeback / redo</span></div>
+
+      <button class="btn green" id="saveBtn" style="margin-top:20px;">Save job</button>
+      <button class="btn grey" id="cancelBtn" style="display:none;">Cancel edit</button>
+      <button class="btn red" id="deleteBtn" style="display:none;">Delete this job</button>
+    </div>
+  </section>
+
+  <!-- JOBS -->
+  <section id="view-jobs" style="display:none;">
+    <h1>Jobs</h1>
+    <div class="sub" id="jobsCount">No jobs yet</div>
+    <button class="btn blue" id="exportBtn" style="margin-bottom:14px;">⬇ Export CSV</button>
+    <div id="jobsList"></div>
+  </section>
+
+  <!-- STATS -->
+  <section id="view-stats" style="display:none;">
+    <h1>Moneyball</h1>
+    <div class="sub">Profit per hour is the number that matters</div>
+    <div class="card" id="statsSummary"></div>
+    <div class="card">
+      <div class="muted" style="font-size:.78rem; text-transform:uppercase; letter-spacing:.05em; margin-bottom:8px;">Gross profit / hour by job type</div>
+      <div id="statsByType"></div>
+    </div>
+    <div class="card">
+      <div class="muted" style="font-size:.78rem; text-transform:uppercase; letter-spacing:.05em; margin-bottom:8px;">Estimate accuracy</div>
+      <div id="statsQuote"></div>
+    </div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section id="view-settings" style="display:none;">
+    <h1>Settings</h1>
+    <div class="card">
+      <div style="font-weight:700; margin-bottom:4px;">Cloud sync</div>
+      <div class="muted" style="font-size:.85rem;">Paste your Supabase details to back jobs up online. Leave blank to keep everything on this phone. See the setup guide.</div>
+      <label>Supabase URL</label>
+      <input id="supaUrl" placeholder="https://xxxx.supabase.co" autocomplete="off" />
+      <label>Supabase anon key</label>
+      <input id="supaKey" placeholder="eyJ..." autocomplete="off" />
+      <button class="btn blue" id="saveSupaBtn" style="margin-top:14px;">Save &amp; connect</button>
+      <button class="btn grey" id="syncBtn">Sync now</button>
+      <small class="hint" id="supaStatus"></small>
+    </div>
+    <div class="card">
+      <div style="font-weight:700; margin-bottom:12px;">Data</div>
+      <button class="btn blue" id="exportBtn2">⬇ Export all as CSV</button>
+      <button class="btn red" id="wipeBtn">Delete all jobs</button>
+    </div>
+  </section>
+
+</div>
+
+<nav>
+  <button data-view="log" class="on"><span class="ic">✏️</span>Log</button>
+  <button data-view="jobs"><span class="ic">📋</span>Jobs</button>
+  <button data-view="stats"><span class="ic">📊</span>Stats</button>
+  <button data-view="settings"><span class="ic">⚙️</span>More</button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+/* ---------- config ---------- */
+const JOB_TYPES = ["Service","Brakes","Clutch","Cambelt/Timing","Diagnostics","Suspension",
+  "Exhaust","Tyres","Battery/Electrical","Aircon","MOT repair","Engine","Welding","Other"];
+const LS_JOBS = "joblog.jobs.v3";
+const LS_SUPA = "joblog.supa.v1";
+const SUPA_DEFAULT = { url:"https://gvyvjfldvbwdiexjyxzh.supabase.co", key:"sb_publishable_qRVzjnqhCrUN6xxrKlWDtw_aSprTZ0T" };
+
+/* ---------- state ---------- */
+let jobs = load(LS_JOBS, []);
+let selType=null, comeback=false, editingId=null, viewDate=null;
+let supa = load(LS_SUPA, SUPA_DEFAULT);
+if(!supa.url || !supa.key){ supa = SUPA_DEFAULT; save(LS_SUPA, supa); }
+let sb = null;
+
+/* ---------- helpers ---------- */
+function load(k,d){ try{ const v=JSON.parse(localStorage.getItem(k)); return v==null?d:v; }catch(e){ return d; } }
+function save(k,v){ localStorage.setItem(k, JSON.stringify(v)); }
+function $(s){ return document.querySelector(s); }
+function toast(m){ const t=$("#toast"); t.textContent=m; t.classList.add("show"); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("show"),1600); }
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function gbp(n){ return "£"+(Math.round(n*100)/100).toLocaleString(undefined,{maximumFractionDigits:2}); }
+function hrs(m){ return (Number(m)||0)/60; }
+function num(id){ return Number($("#"+id).value)||0; }
+
+function jobTotal(j){ return (Number(j.labourCharged)||0)+(Number(j.partsCharged)||0); }
+function jobGP(j){ return jobTotal(j)-(Number(j.partsCost)||0); }
+function jobPartsProfit(j){ return (Number(j.partsCharged)||0)-(Number(j.partsCost)||0); }
+function jobGPH(j){ const h=hrs(j.actualMins); return h>0 ? jobGP(j)/h : null; }
+
+/* ---------- build chips ---------- */
+function buildChips(){
+  const tc=$("#jobTypeChips");
+  JOB_TYPES.forEach(t=>{ const c=document.createElement("span"); c.className="chip"; c.textContent=t;
+    c.onclick=()=>{ selType=t; [...tc.children].forEach(x=>x.classList.remove("on")); c.classList.add("on"); }; tc.appendChild(c); });
+}
+function updateAge(){ const r=$("#ageRange"); const v=+r.value;
+  $("#ageOut").textContent = v>=40 ? "40+ yrs" : v+(v===1?" yr":" yrs");
+  r.style.setProperty("--fill", ((v-1)/39*100)+"%"); }
+
+/* ---------- save / edit / delete ---------- */
+function saveJob(){
+  if(!selType){ toast("Pick a job type"); return; }
+  const mins = num("hrs")*60 + num("mins");
+  if(mins<=0){ toast("How long did it take?"); return; }
+  const data={ date:$("#jobDate").value || new Date().toISOString().slice(0,10),
+    jobType:selType, actualMins:mins,
+    labourCharged:num("labourCharged"), partsCharged:num("partsCharged"), partsCost:num("partsCost"),
+    make:$("#make").value.trim(), model:$("#model").value.trim(), ageYears:+$("#ageRange").value,
+    quotedHours:(num("estHrs")*60+num("estMins"))/60, customer:$("#customer").value.trim(),
+    notes:$("#notes").value.trim(), comeback:comeback };
+  const wasEditing = editingId;
+  if(editingId){
+    const j=jobs.find(x=>x.id===editingId);
+    if(j){ Object.assign(j, data); j.synced=false; if(sb) pushOne(j); }
+    toast("Updated ✓");
+  } else {
+    const j={ id:uid(), createdAt:new Date().toISOString(), ...data, synced:false };
+    jobs.unshift(j); if(sb) pushOne(j); toast("Saved ✓");
+  }
+  save(LS_JOBS,jobs); clearForm(); renderJobs(); renderStats();
+  if(wasEditing) showView("jobs");
+}
+function editJob(id){
+  const j=jobs.find(x=>x.id===id); if(!j) return;
+  editingId=id; selType=j.jobType; comeback=!!j.comeback;
+  document.querySelectorAll("#jobTypeChips .chip").forEach(c=>c.classList.toggle("on", c.textContent===j.jobType));
+  $("#comebackChip").classList.toggle("on", comeback);
+  $("#jobDate").value=j.date;
+  $("#hrs").value=Math.floor(j.actualMins/60)||""; $("#mins").value=j.actualMins%60||"";
+  $("#labourCharged").value=j.labourCharged||""; $("#partsCharged").value=j.partsCharged||""; $("#partsCost").value=j.partsCost||"";
+  $("#make").value=j.make||""; $("#model").value=j.model||"";
+  $("#ageRange").value=j.ageYears||10; updateAge();
+  const qm=Math.round((j.quotedHours||0)*60); $("#estHrs").value=Math.floor(qm/60)||""; $("#estMins").value=qm%60||"";
+  $("#customer").value=j.customer||""; $("#notes").value=j.notes||"";
+  $("#saveBtn").textContent="Update job"; $("#cancelBtn").style.display="flex"; $("#deleteBtn").style.display="flex";
+  showView("log");
+}
+function deleteJob(){
+  if(!editingId) return;
+  if(!confirm("Delete this job? This cannot be undone.")) return;
+  const id=editingId;
+  jobs=jobs.filter(x=>x.id!==id); save(LS_JOBS,jobs);
+  if(sb){ sb.from("jobs").delete().eq("id",id).then(()=>{}); }
+  clearForm(); toast("Deleted"); renderJobs(); renderStats(); showView("jobs");
+}
+function clearForm(){
+  selType=null; comeback=false; editingId=null;
+  ["hrs","mins","labourCharged","partsCharged","partsCost","make","model","estHrs","estMins","customer","notes"].forEach(id=>$("#"+id).value="");
+  $("#jobDate").value=new Date().toISOString().slice(0,10);
+  $("#ageRange").value=10; updateAge(); $("#comebackChip").classList.remove("on");
+  document.querySelectorAll("#jobTypeChips .chip").forEach(x=>x.classList.remove("on"));
+  $("#saveBtn").textContent="Save job"; $("#cancelBtn").style.display="none"; $("#deleteBtn").style.display="none";
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+
+/* ---------- jobs list (grouped by date) ---------- */
+function fmtDate(d){ const dt=new Date(d+"T00:00:00");
+  return isNaN(dt) ? d : dt.toLocaleDateString(undefined,{weekday:"short",day:"numeric",month:"short",year:"numeric"}); }
+function renderJobs(){
+  const list=$("#jobsList"); list.innerHTML="";
+  if(!jobs.length){ $("#jobsCount").textContent="No jobs yet"; $("#exportBtn").style.display="none";
+    list.innerHTML='<div class="empty">Log your first job and it shows up here.</div>'; return; }
+  $("#exportBtn").style.display="flex";
+  if(viewDate) renderDay(list); else renderDateList(list);
+}
+function renderDateList(list){
+  const byDate={}; jobs.forEach(j=>{ (byDate[j.date]=byDate[j.date]||[]).push(j); });
+  const dates=Object.keys(byDate).sort((a,b)=>b.localeCompare(a));
+  $("#jobsCount").textContent=`${jobs.length} job${jobs.length>1?"s":""} · ${dates.length} day${dates.length>1?"s":""}`;
+  dates.forEach(d=>{
+    const arr=byDate[d];
+    const total=arr.reduce((a,j)=>a+jobTotal(j),0), gp=arr.reduce((a,j)=>a+jobGP(j),0);
+    const c=document.createElement("div"); c.className="job"; c.style.cursor="pointer";
+    c.innerHTML=`<div class="top"><div><div class="ty">${fmtDate(d)}</div>
+      <div class="meta">${arr.length} job${arr.length>1?"s":""} · ${gbp(total)} charged</div></div>
+      <div class="gph">${gbp(gp)}<div class="meta" style="text-align:right; color:var(--muted);">profit ›</div></div></div>`;
+    c.onclick=()=>{ viewDate=d; renderJobs(); window.scrollTo(0,0); };
+    list.appendChild(c);
+  });
+}
+function renderDay(list){
+  const arr=jobs.filter(j=>j.date===viewDate);
+  if(!arr.length){ viewDate=null; renderJobs(); return; }
+  $("#jobsCount").textContent=fmtDate(viewDate);
+  const back=document.createElement("button"); back.className="btn grey"; back.textContent="‹ All dates";
+  back.style.marginBottom="14px"; back.onclick=()=>{ viewDate=null; renderJobs(); window.scrollTo(0,0); };
+  list.appendChild(back);
+  arr.forEach(j=>{
+    const gph=jobGPH(j); const veh=[j.make,j.model].filter(Boolean).join(" ");
+    const under=j.quotedHours>0 && hrs(j.actualMins) > j.quotedHours*1.1;
+    const d=document.createElement("div"); d.className="job"; d.style.cursor="pointer";
+    d.innerHTML=`<div class="top">
+      <div><div class="ty">${j.jobType}</div>
+      <div class="meta">${veh||"—"}${j.ageYears?" · "+j.ageYears+"yr":""} · ${j.actualMins}min · ${gbp(jobTotal(j))}</div>
+      <div class="meta">${j.customer||""}</div></div>
+      <div class="gph">${gph!=null?gbp(gph)+"/h":"—"}</div></div>
+      ${j.comeback?'<span class="pill cb">comeback</span>':''}${under?'<span class="pill under">over estimate</span>':''}
+      <div class="meta" style="margin-top:9px; color:var(--accent2);">Tap to edit ›</div>`;
+    d.onclick=()=>editJob(j.id);
+    list.appendChild(d);
+  });
+}
+
+/* ---------- stats ---------- */
+function renderStats(){
+  const sum=$("#statsSummary");
+  if(!jobs.length){ sum.innerHTML='<div class="empty">No data yet. Stats appear after you log jobs.</div>';
+    $("#statsByType").innerHTML=""; $("#statsQuote").innerHTML=""; return; }
+  const tGP=jobs.reduce((a,j)=>a+jobGP(j),0), tH=jobs.reduce((a,j)=>a+hrs(j.actualMins),0);
+  const tRev=jobs.reduce((a,j)=>a+jobTotal(j),0);
+  const tPartsProfit=jobs.reduce((a,j)=>a+jobPartsProfit(j),0);
+  const tLabour=jobs.reduce((a,j)=>a+(Number(j.labourCharged)||0),0);
+  const avg=tH>0?tGP/tH:0, cb=jobs.filter(j=>j.comeback).length;
+  sum.innerHTML=`
+    <div class="stat"><span>Avg gross profit / hour</span><span class="v">${gbp(avg)}</span></div>
+    <div class="stat"><span>Total gross profit</span><span class="v">${gbp(tGP)}</span></div>
+    <div class="stat"><span>&nbsp;&nbsp;↳ from labour</span><span class="v">${gbp(tLabour)}</span></div>
+    <div class="stat"><span>&nbsp;&nbsp;↳ from parts markup</span><span class="v">${gbp(tPartsProfit)}</span></div>
+    <div class="stat"><span>Total charged</span><span class="v">${gbp(tRev)}</span></div>
+    <div class="stat"><span>Hours on the tools</span><span class="v">${tH.toFixed(1)}h</span></div>
+    <div class="stat"><span>Comebacks</span><span class="v">${cb}</span></div>`;
+  const byType={};
+  jobs.forEach(j=>{ const t=j.jobType; (byType[t]=byType[t]||{gp:0,h:0,n:0}); byType[t].gp+=jobGP(j); byType[t].h+=hrs(j.actualMins); byType[t].n++; });
+  const rows=Object.entries(byType).map(([t,v])=>({t,gph:v.h>0?v.gp/v.h:0,n:v.n})).sort((a,b)=>b.gph-a.gph);
+  const max=Math.max(...rows.map(r=>r.gph),1);
+  $("#statsByType").innerHTML=rows.map(r=>`<div class="barRow"><div class="h"><span>${r.t} <span class="muted">(${r.n})</span></span><span>${gbp(r.gph)}/h</span></div><div class="bar"><span style="width:${Math.max(4,r.gph/max*100)}%"></span></div></div>`).join("");
+  const q=jobs.filter(j=>j.quotedHours>0);
+  if(!q.length){ $("#statsQuote").innerHTML='<div class="muted">Add "estimated at start" to jobs to see where you under-estimate.</div>'; return; }
+  const qt={}; q.forEach(j=>{ const t=j.jobType; (qt[t]=qt[t]||{q:0,a:0,n:0}); qt[t].q+=j.quotedHours; qt[t].a+=hrs(j.actualMins); qt[t].n++; });
+  const qr=Object.entries(qt).map(([t,v])=>({t,ratio:v.a/v.q,n:v.n})).sort((a,b)=>b.ratio-a.ratio);
+  $("#statsQuote").innerHTML=qr.map(r=>{ const pct=Math.round((r.ratio-1)*100); const over=pct>10;
+    return `<div class="stat"><span>${r.t} <span class="muted">(${r.n})</span></span><span class="v" style="color:${over?'var(--warn)':'var(--accent)'}">${pct>0?"+":""}${pct}%</span></div>`;
+  }).join("")+'<small class="hint">+ = the job takes longer than you estimated. These are where you are quietly losing money.</small>';
+}
+
+/* ---------- export ---------- */
+function exportCSV(){
+  if(!jobs.length){ toast("No jobs to export"); return; }
+  const cols=["date","jobType","make","model","ageYears","actualMins","quotedHours","labourCharged","partsCharged","partsCost","totalCharged","grossProfit","customer","comeback","notes","createdAt"];
+  const esc=v=>{ v=(v==null?"":String(v)); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
+  const rowOut=j=>({ ...j, totalCharged:jobTotal(j), grossProfit:jobGP(j) });
+  const csv=cols.join(",")+"\n"+jobs.map(j=>{ const r=rowOut(j); return cols.map(c=>esc(r[c])).join(","); }).join("\n");
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+  a.download="joblog-"+new Date().toISOString().slice(0,10)+".csv"; a.click(); toast("CSV exported");
+}
+
+/* ---------- supabase ---------- */
+function initSupa(){
+  if(supa.url && supa.key && window.supabase){
+    try{ sb=window.supabase.createClient(supa.url,supa.key);
+      $("#cloudBadge").textContent="cloud"; $("#cloudBadge").classList.add("on"); $("#supaStatus").textContent="Connected."; }
+    catch(e){ sb=null; $("#supaStatus").textContent="Could not connect: "+e.message; }
+  }
+}
+function rowFor(j){ return { id:j.id, created_at:j.createdAt, job_date:j.date, job_type:j.jobType, make:j.make,
+  model:j.model, age_years:j.ageYears, actual_mins:j.actualMins, quoted_hours:j.quotedHours,
+  labour_charged:j.labourCharged, parts_charged:j.partsCharged, parts_cost:j.partsCost,
+  total_charged:jobTotal(j), customer:j.customer, notes:j.notes, comeback:j.comeback }; }
+async function pushOne(j){ if(!sb) return; try{ const {error}=await sb.from("jobs").upsert(rowFor(j)); if(!error){ j.synced=true; save(LS_JOBS,jobs); } }catch(e){} }
+async function syncAll(){
+  if(!sb){ toast("Add Supabase details first"); return; }
+  const p=jobs.filter(j=>!j.synced); if(!p.length){ toast("Already synced"); return; }
+  try{ const {error}=await sb.from("jobs").upsert(p.map(rowFor));
+    if(error){ toast("Sync failed"); $("#supaStatus").textContent=error.message; return; }
+    p.forEach(j=>j.synced=true); save(LS_JOBS,jobs); toast("Synced "+p.length+" jobs"); }
+  catch(e){ toast("Sync failed"); $("#supaStatus").textContent=e.message; }
+}
+
+/* ---------- nav ---------- */
+function showView(v){
+  ["log","jobs","stats","settings"].forEach(n=>$("#view-"+n).style.display=(n===v?"block":"none"));
+  document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b.dataset.view===v));
+  if(v==="jobs") renderJobs(); if(v==="stats") renderStats();
+  window.scrollTo(0,0);
+}
+
+/* ---------- wire ---------- */
+buildChips(); updateAge();
+$("#ageRange").addEventListener("input", updateAge);
+$("#saveBtn").onclick=saveJob;
+$("#cancelBtn").onclick=function(){ clearForm(); showView("jobs"); };
+$("#deleteBtn").onclick=deleteJob;
+$("#comebackChip").onclick=function(){ comeback=!comeback; this.classList.toggle("on",comeback); };
+$("#exportBtn").onclick=exportCSV; $("#exportBtn2").onclick=exportCSV;
+$("#wipeBtn").onclick=function(){ if(confirm("Delete ALL jobs on this phone? Cannot be undone.")){ jobs=[]; save(LS_JOBS,jobs); renderJobs(); renderStats(); toast("All jobs deleted"); } };
+$("#saveSupaBtn").onclick=function(){ supa={url:$("#supaUrl").value.trim(),key:$("#supaKey").value.trim()}; save(LS_SUPA,supa); initSupa(); toast("Saved"); };
+$("#syncBtn").onclick=syncAll;
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{
+  const v=b.dataset.view;
+  if(v!=="log" && editingId) clearForm();
+  if(v==="jobs") viewDate=null;
+  showView(v);
+});
+$("#supaUrl").value=supa.url||""; $("#supaKey").value=supa.key||"";
+$("#jobDate").value=new Date().toISOString().slice(0,10);
+window.addEventListener("load", initSupa);
+renderJobs(); renderStats();
+</script>
+</body>
+</html>
