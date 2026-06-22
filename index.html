@@ -366,7 +366,7 @@ function buildChips(){
   other.onclick=()=>{ showPrompt("Add a job type","e.g. Air-con regas",(name)=>{
     if(!allJobTypes().some(x=>x.toLowerCase()===name.toLowerCase())){ customTypes.push(name); save(LS_TYPES,customTypes); }
     if(!selTypes.some(x=>x.toLowerCase()===name.toLowerCase())) selTypes.push(name);
-    buildChips(); }); };
+    pushOption("jobtype",name); buildChips(); }); };
   tc.appendChild(other);
 }
 function updateAge(){ const r=$("#ageRange"); const v=+r.value;
@@ -386,6 +386,7 @@ function attachCombo(input, list, optionsFn, onPick, otherLabel){
     matches.forEach(o=>{ const d=document.createElement("div"); d.textContent=o; d.onclick=()=>pick(o); list.appendChild(d); });
     if(otherLabel){ const o=document.createElement("div"); o.className="add"; o.textContent="Other…";
       o.onclick=()=>{ showPrompt("Add a "+otherLabel,"Type the "+otherLabel,(v)=>pick(v)); }; list.appendChild(o); }
+    document.querySelectorAll(".combo-list").forEach(l=>{ if(l!==list) l.classList.remove("open"); });
     list.classList.toggle("open", list.children.length>0);
   }
   input.addEventListener("focus",render);
@@ -395,6 +396,8 @@ function persistCustom(){
   const mk=$("#make").value.trim(), md=$("#model").value.trim();
   if(mk && !allMakes().some(x=>x.toLowerCase()===mk.toLowerCase())){ customMakes.push(mk); save(LS_MAKES,customMakes); }
   if(md && !allModels().some(x=>x.toLowerCase()===md.toLowerCase())){ customModels.push(md); save(LS_MODELS,customModels); }
+  if(mk && !MAKES_SEED.some(x=>x.toLowerCase()===mk.toLowerCase())) pushOption("make",mk);
+  if(md && !MODELS_SEED.some(x=>x.toLowerCase()===md.toLowerCase())) pushOption("model",md);
 }
 function renderCustomerCars(){
   const box=$("#customerCars"); box.innerHTML="";
@@ -622,6 +625,23 @@ function flushUnsynced(){
   if(!sb) return;
   customers.forEach(c=>pushCustomer(c));
   jobs.filter(j=>!j.synced).forEach(j=>pushOne(j));
+  customMakes.forEach(v=>pushOption("make",v));
+  customModels.forEach(v=>pushOption("model",v));
+  customTypes.forEach(v=>pushOption("jobtype",v));
+  loadOptions();
+}
+async function pushOption(kind,value){ if(!sb||!value) return; try{ await sb.from("options").upsert({kind,value},{onConflict:"kind,value"}); }catch(e){} }
+async function loadOptions(){
+  if(!sb) return;
+  try{ const {data,error}=await sb.from("options").select("kind,value"); if(error||!data) return;
+    let changed=false;
+    data.forEach(o=>{ const v=(o.value||"").trim(); if(!v) return;
+      if(o.kind==="make" && !allMakes().some(x=>x.toLowerCase()===v.toLowerCase())){ customMakes.push(v); changed=true; }
+      else if(o.kind==="model" && !allModels().some(x=>x.toLowerCase()===v.toLowerCase())){ customModels.push(v); changed=true; }
+      else if(o.kind==="jobtype" && !allJobTypes().some(x=>x.toLowerCase()===v.toLowerCase())){ customTypes.push(v); changed=true; }
+    });
+    if(changed){ save(LS_MAKES,customMakes); save(LS_MODELS,customModels); save(LS_TYPES,customTypes); buildChips(); }
+  }catch(e){}
 }
 function rowFor(j){ return { id:j.id, created_at:j.createdAt, job_date:j.date, job_type:typeLabel(j), make:j.make,
   model:j.model, reg:j.reg, customer_id:j.customerId, age_years:j.ageYears, actual_mins:j.actualMins, quoted_hours:j.quotedHours,
