@@ -170,7 +170,8 @@
       <div class="divider">Or enter manually</div>
 
       <label>Job type <span class="opt">(tap all that apply)</span></label>
-      <input id="typeSearch" placeholder="Search job types…" autocomplete="off" style="margin-bottom:10px;" />
+      <input id="typeSearch" placeholder="Search any job type…" autocomplete="off" style="margin-bottom:8px;" />
+      <div class="hint-inline" style="margin:0 0 8px;">Quick picks below — search above for anything else</div>
       <div class="chips" id="jobTypeChips"></div>
       <div id="smallDescBlock" style="display:none;">
         <label>What was the job?</label>
@@ -243,7 +244,7 @@
 
       <div id="notesBlock">
         <label>Notes</label>
-        <textarea id="notes" rows="2" placeholder="Anything worth remembering"></textarea>
+        <textarea id="notes" rows="2" placeholder="Any more useful context?"></textarea>
       </div>
 
       <button class="btn green" id="saveBtn" style="margin-top:20px;">Save job</button>
@@ -392,33 +393,50 @@ const MAKES_SEED = ["Audi","BMW","Citroën","Dacia","Fiat","Ford","Honda","Hyund
   "Land Rover","Lexus","Mazda","Mercedes-Benz","MG","MINI","Nissan","Peugeot","Renault","SEAT",
   "Škoda","Suzuki","Tesla","Toyota","Vauxhall","Volkswagen","Volvo"];
 const MODELS_BY_MAKE = {
-  "Audi":["A1","A3","A4","A5","A6","Q2","Q3","Q5","TT"],
-  "BMW":["1 Series","2 Series","3 Series","4 Series","5 Series","X1","X3","X5"],
-  "Citroën":["C1","C3","C4","C3 Aircross","C5 Aircross","Berlingo"],
-  "Dacia":["Sandero","Duster","Logan"],
-  "Fiat":["500","Panda","Punto","Tipo"],
-  "Ford":["Fiesta","Focus","Kuga","Puma","Mondeo","EcoSport","KA","Transit","Transit Custom"],
-  "Honda":["Jazz","Civic","CR-V","HR-V"],
-  "Hyundai":["i10","i20","i30","Tucson","Kona"],
-  "Jaguar":["XE","XF","F-Pace","E-Pace"],
-  "Kia":["Picanto","Rio","Ceed","Sportage","Niro"],
-  "Land Rover":["Defender","Discovery","Discovery Sport","Range Rover","Range Rover Evoque","Freelander"],
-  "Lexus":["IS","CT","NX","RX"],
-  "Mazda":["2","3","6","CX-3","CX-5","MX-5"],
-  "Mercedes-Benz":["A-Class","B-Class","C-Class","E-Class","CLA","GLA","GLC"],
-  "MG":["MG3","ZS","HS","MG5"],
-  "MINI":["Hatch","Countryman","Clubman"],
-  "Nissan":["Micra","Note","Juke","Qashqai","X-Trail","Leaf"],
-  "Peugeot":["108","208","308","2008","3008","5008","Partner"],
-  "Renault":["Clio","Captur","Megane","Kadjar","Scenic"],
-  "SEAT":["Ibiza","Leon","Arona","Ateca"],
-  "Škoda":["Fabia","Octavia","Superb","Scala","Karoq","Kodiaq"],
-  "Suzuki":["Swift","Vitara","Ignis","SX4 S-Cross"],
+  "Abarth":["595","695","124 Spider"],
+  "Alfa Romeo":["MiTo","Giulietta","Giulia","Stelvio","159","Brera","Tonale"],
+  "Audi":["A1","A2","A3","A4","A5","A6","A7","A8","Q2","Q3","Q5","Q7","Q8","TT","R8","S3","RS3","e-tron"],
+  "Bentley":["Continental GT","Bentayga","Flying Spur"],
+  "BMW":["1 Series","2 Series","3 Series","4 Series","5 Series","6 Series","7 Series","8 Series","X1","X2","X3","X4","X5","X6","X7","Z4","i3","i4","M3","M4"],
+  "Chevrolet":["Spark","Aveo","Cruze","Captiva","Matiz","Orlando"],
+  "Chrysler":["300C","Ypsilon","Grand Voyager"],
+  "Citroën":["C1","C2","C3","C4","C4 Cactus","C5","C3 Aircross","C5 Aircross","Berlingo","Nemo","Dispatch","Relay","Saxo","Xsara","DS3"],
+  "Cupra":["Formentor","Leon","Born","Ateca"],
+  "Dacia":["Sandero","Duster","Logan","Spring","Jogger"],
+  "DS":["DS3","DS4","DS7"],
+  "Fiat":["500","500X","500L","Panda","Punto","Tipo","Doblo","Qubo","Bravo","Ducato","Multipla"],
+  "Ford":["Ka","Fiesta","Focus","Puma","Kuga","EcoSport","Mondeo","Galaxy","S-Max","B-Max","C-Max","Mustang","Ranger","Transit","Transit Custom","Transit Connect","Tourneo"],
+  "Genesis":["G70","GV70","GV80"],
+  "Honda":["Jazz","Civic","Accord","CR-V","HR-V","CR-Z","Insight","e"],
+  "Hyundai":["i10","i20","i30","i40","ix20","ix35","Tucson","Kona","Santa Fe","Ioniq","Bayon"],
+  "Jaguar":["XE","XF","XJ","S-Type","X-Type","F-Type","F-Pace","E-Pace","I-Pace"],
+  "Jeep":["Renegade","Compass","Cherokee","Grand Cherokee","Wrangler"],
+  "Kia":["Picanto","Rio","Ceed","ProCeed","XCeed","Soul","Venga","Stonic","Sportage","Niro","Sorento","Optima","EV6"],
+  "Land Rover":["Defender","Discovery","Discovery Sport","Freelander","Range Rover","Range Rover Sport","Range Rover Evoque","Range Rover Velar"],
+  "Lexus":["CT","UX","IS","ES","GS","LS","NX","RX","RC"],
+  "Maserati":["Ghibli","Levante","Quattroporte"],
+  "Mazda":["2","3","6","CX-3","CX-30","CX-5","CX-60","MX-5","MX-30","RX-8"],
+  "Mercedes-Benz":["A-Class","B-Class","C-Class","E-Class","S-Class","CLA","CLS","GLA","GLB","GLC","GLE","GLS","V-Class","Vito","Sprinter"],
+  "MG":["MG3","ZS","ZS EV","HS","MG5","MG4","MG6","TF","MGB"],
+  "MINI":["Hatch","Convertible","Clubman","Countryman","Paceman","Coupe"],
+  "Mitsubishi":["Mirage","Colt","ASX","Outlander","Eclipse Cross","Shogun","L200"],
+  "Nissan":["Micra","Note","Leaf","Juke","Qashqai","X-Trail","Ariya","Navara","Primera","Almera","Pulsar"],
+  "Peugeot":["106","107","108","206","207","208","306","307","308","406","407","508","2008","3008","5008","Partner","Rifter","Expert","Boxer"],
+  "Polestar":["Polestar 2","Polestar 3"],
+  "Porsche":["911","718 Boxster","718 Cayman","Cayenne","Macan","Panamera","Taycan"],
+  "Renault":["Twingo","Clio","Captur","Megane","Kadjar","Scenic","Zoe","Trafic","Master","Laguna","Espace","Koleos"],
+  "Saab":["9-3","9-5"],
+  "SEAT":["Mii","Ibiza","Leon","Arona","Ateca","Tarraco","Alhambra","Toledo"],
+  "Škoda":["Citigo","Fabia","Scala","Rapid","Octavia","Superb","Kamiq","Karoq","Kodiaq","Yeti","Enyaq"],
+  "Smart":["ForTwo","ForFour"],
+  "SsangYong":["Tivoli","Korando","Rexton","Musso"],
+  "Subaru":["Impreza","WRX","Forester","Outback","XV","Legacy","BRZ","Levorg"],
+  "Suzuki":["Alto","Celerio","Swift","Baleno","Ignis","Vitara","S-Cross","Jimny","Wagon R","Splash"],
   "Tesla":["Model 3","Model Y","Model S","Model X"],
-  "Toyota":["Aygo","Yaris","Corolla","Auris","C-HR","RAV4"],
-  "Vauxhall":["Corsa","Astra","Insignia","Mokka","Crossland","Grandland","Zafira","Viva"],
-  "Volkswagen":["Up","Polo","Golf","Passat","Tiguan","T-Roc","Touran"],
-  "Volvo":["V40","V60","S60","XC40","XC60","XC90"]
+  "Toyota":["Aygo","Aygo X","Yaris","Yaris Cross","Corolla","Auris","Avensis","Verso","C-HR","RAV4","Prius","GR86","GT86","Supra","Hilux","Land Cruiser","Proace"],
+  "Vauxhall":["Adam","Viva","Agila","Corsa","Astra","Insignia","Meriva","Mokka","Crossland","Grandland","Antara","Zafira","Cascada","Vivaro","Combo","Movano"],
+  "Volkswagen":["Up","Polo","Golf","Jetta","Passat","Arteon","Scirocco","Beetle","T-Cross","T-Roc","Tiguan","Touran","Sharan","Touareg","Caddy","Transporter","ID.3","ID.4"],
+  "Volvo":["C30","V40","V50","V60","V70","S40","S60","S80","XC40","XC60","XC70","XC90","C70"]
 };
 const LS_JOBS="joblog.jobs.v3", LS_SUPA="joblog.supa.v1", LS_CUST="joblog.customers.v1",
   LS_MAKES="joblog.makes.v1", LS_MODELS="joblog.models.v1", LS_TYPES="joblog.types.v1";
@@ -450,7 +468,7 @@ function today(){ return new Date().toISOString().slice(0,10); }
 function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 function uniqSort(a){ return [...new Set(a)].sort((x,y)=>x.localeCompare(y)); }
 function normReg(r){ return (r||"").toUpperCase().replace(/\s+/g,""); }
-function allMakes(){ return uniqSort([...MAKES_SEED,...customMakes]); }
+function allMakes(){ return uniqSort([...MAKES_SEED,...Object.keys(MODELS_BY_MAKE),...customMakes]); }
 function modelsForMake(make){
   const mk=(make||"").trim().toLowerCase();
   const key=Object.keys(MODELS_BY_MAKE).find(k=>k.toLowerCase()===mk);
@@ -1046,7 +1064,7 @@ function jobFromRow(r){ return { id:r.id, createdAt:r.created_at, date:r.job_dat
   labourCharged:Number(r.labour_charged)||0, partsCharged:Number(r.parts_charged)||0, partsCost:Number(r.parts_cost)||0,
   motResult:r.mot_result||null, motWork:r.mot_work||"", motCostUs:Number(r.mot_cost_us)||0, motCostCustomer:Number(r.mot_cost_customer)||0,
   customer:r.customer||"", notes:r.notes||"", comeback:!!r.comeback,
-  closed:(r.closed!=null?!!r.closed:((Number(r.labour_charged)||0)+(Number(r.parts_charged)||0)+(Number(r.mot_cost_customer)||0)>0 || Number(r.actual_mins)>0)), synced:true }; }
+  closed:(r.closed!=null?!!r.closed:((Number(r.labour_charged)||0)+(Number(r.parts_charged)||0)+(Number(r.mot_cost_customer)||0)>0)), synced:true }; }
 function custFromRow(r){ return { id:r.id, name:r.name||"", phone:r.phone||"", cars:Array.isArray(r.cars)?r.cars:(r.cars||[]), createdAt:r.created_at }; }
 function purchFromRow(r){ return { id:r.id, createdAt:r.created_at, date:r.purchase_date, supplier:r.supplier||"", net:Number(r.net)||0, vat:Number(r.vat)||0, gross:Number(r.gross)||0, notes:r.notes||"" }; }
 function mergeJobs(remote){ const byId={}; jobs.forEach(j=>byId[j.id]=j);
@@ -1108,7 +1126,8 @@ function showView(v){
 
 /* ---------- wire ---------- */
 customTypes=customTypes.filter(t=>!JOB_TYPES.some(s=>s.toLowerCase()===(t||"").toLowerCase())); save(LS_TYPES,customTypes);
-jobs.forEach(j=>{ if(j.closed===undefined) j.closed=(jobTotal(j)>0||Number(j.actualMins)>0); }); save(LS_JOBS,jobs);
+if(localStorage.getItem("joblog.migrate.v2")!=="1"){ jobs.forEach(j=>{ j.closed=(jobTotal(j)>0); j.synced=false; }); save(LS_JOBS,jobs); localStorage.setItem("joblog.migrate.v2","1"); }
+else { jobs.forEach(j=>{ if(j.closed===undefined) j.closed=(jobTotal(j)>0); }); save(LS_JOBS,jobs); }
 buildChips();
 attachCombo($("#make"), $("#makeList"), allMakes, ()=>{ $("#modelList").classList.remove("open"); }, "make");
 attachCombo($("#model"), $("#modelList"), ()=>modelsForMake($("#make").value), null, "model");
