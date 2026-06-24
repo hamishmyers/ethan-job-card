@@ -430,7 +430,6 @@ function onPickCustomer(name){ const m=customersByName(name);
 function saveJob(){
   if(!selTypes.length){ toast("Pick at least one job type"); return; }
   const mins = num("hrs")*60 + num("mins");
-  if(mins<=0){ toast("How long did it take?"); return; }
   persistCustom();
   pending={ date:$("#jobDate").value||today(),
     jobTypes:selTypes.slice(), jobType:selTypes.join(" + "), actualMins:mins,
@@ -459,8 +458,9 @@ function commitSave(customerId, createNew){
   if(sb && customerId) pushCustomer(getCustomer(customerId));
   pending.customerId=customerId||"";
   const wasEditing=editingId;
-  if(editingId){ const j=jobs.find(x=>x.id===editingId); if(j){ Object.assign(j,pending); j.synced=false; if(sb)pushOne(j); } toast("Updated ✓"); }
-  else{ const j={ id:uid(), createdAt:new Date().toISOString(), ...pending, synced:false }; jobs.unshift(j); if(sb)pushOne(j); toast("Saved ✓"); }
+  const noTime=!(Number(pending.actualMins)>0);
+  if(editingId){ const j=jobs.find(x=>x.id===editingId); if(j){ Object.assign(j,pending); j.synced=false; if(sb)pushOne(j); } toast(noTime?"Saved — add time to finish":"Updated ✓"); }
+  else{ const j={ id:uid(), createdAt:new Date().toISOString(), ...pending, synced:false }; jobs.unshift(j); if(sb)pushOne(j); toast(noTime?"Saved — add time to finish":"Saved ✓"); }
   save(LS_JOBS,jobs); closeDupModal(); clearForm(); renderJobs(); renderStats();
   if(wasEditing) showView("jobs");
 }
@@ -575,15 +575,42 @@ function clearForm(){
 
 /* ---------- jobs list (grouped by date) ---------- */
 function fmtDate(d){ const dt=new Date(d+"T00:00:00"); return isNaN(dt)?d:dt.toLocaleDateString(undefined,{weekday:"short",day:"numeric",month:"short",year:"numeric"}); }
+function jobOpen(j){ return !(Number(j.actualMins)>0); }
+function jobCard(j){
+  const open=jobOpen(j);
+  const gph=jobGPH(j); const veh=[j.make,j.model].filter(Boolean).join(" ");
+  const under=j.quotedHours>0 && hrs(j.actualMins) > j.quotedHours*1.1;
+  const d=document.createElement("div"); d.className="job"; d.style.cursor="pointer";
+  if(open) d.style.borderColor="rgba(251,191,36,.45)";
+  d.innerHTML=`<div class="top">
+    <div><div class="ty">${esc(typeLabel(j))}</div>
+    <div class="meta">${esc(veh)||"—"}${j.reg?" · "+esc(j.reg):""}${open?"":" · "+j.actualMins+"min"} · ${gbp(jobTotal(j))}</div>
+    <div class="meta">${esc(j.customer||"")}${open?(j.customer?" · ":"")+fmtDate(j.date):""}</div></div>
+    <div class="gph">${open?'<span style="color:var(--warn); font-size:.85rem;">add time ›</span>':(gph!=null?gbp(gph)+"/h":"—")}</div></div>
+    ${j.comeback?'<span class="pill cb">comeback</span>':''}${under?'<span class="pill under">over estimate</span>':''}${open?'<span class="pill under">needs time</span>':''}
+    <div class="meta" style="margin-top:9px; color:var(--accent2);">${open?"Tap to add time ›":"Tap to edit ›"}</div>`;
+  d.onclick=()=>editJob(j.id);
+  return d;
+}
 function renderJobs(){
   const list=$("#jobsList"); list.innerHTML="";
   if(!jobs.length){ $("#jobsCount").textContent="No jobs yet"; list.innerHTML='<div class="empty">Log your first job and it shows up here.</div>'; return; }
   if(viewDate) renderDay(list); else renderDateList(list);
 }
 function renderDateList(list){
-  const byDate={}; jobs.forEach(j=>{ (byDate[j.date]=byDate[j.date]||[]).push(j); });
+  const open=jobs.filter(jobOpen);
+  if(open.length){
+    const h=document.createElement("div"); h.className="sub";
+    h.style.cssText="color:var(--warn); font-weight:700; margin:2px 0 10px;";
+    h.textContent="⏱ To finish — add time ("+open.length+")";
+    list.appendChild(h);
+    open.forEach(j=>list.appendChild(jobCard(j)));
+    const dv=document.createElement("div"); dv.className="divider"; dv.textContent="Logged"; list.appendChild(dv);
+  }
+  const done=jobs.filter(j=>!jobOpen(j));
+  const byDate={}; done.forEach(j=>{ (byDate[j.date]=byDate[j.date]||[]).push(j); });
   const dates=Object.keys(byDate).sort((a,b)=>b.localeCompare(a));
-  $("#jobsCount").textContent=`${jobs.length} job${jobs.length>1?"s":""} · ${dates.length} day${dates.length>1?"s":""}`;
+  $("#jobsCount").textContent = `${jobs.length} job${jobs.length>1?"s":""}`+(open.length?` · ${open.length} to finish`:"");
   dates.forEach(d=>{
     const arr=byDate[d];
     const total=arr.reduce((a,j)=>a+jobTotal(j),0), gp=arr.reduce((a,j)=>a+jobGP(j),0);
@@ -602,32 +629,20 @@ function renderDay(list){
   const back=document.createElement("button"); back.className="btn grey"; back.textContent="‹ All dates";
   back.style.marginBottom="14px"; back.onclick=()=>{ viewDate=null; renderJobs(); window.scrollTo(0,0); };
   list.appendChild(back);
-  arr.forEach(j=>{
-    const gph=jobGPH(j); const veh=[j.make,j.model].filter(Boolean).join(" ");
-    const under=j.quotedHours>0 && hrs(j.actualMins) > j.quotedHours*1.1;
-    const d=document.createElement("div"); d.className="job"; d.style.cursor="pointer";
-    d.innerHTML=`<div class="top">
-      <div><div class="ty">${esc(typeLabel(j))}</div>
-      <div class="meta">${esc(veh)||"—"}${j.reg?" · "+esc(j.reg):""} · ${j.actualMins}min · ${gbp(jobTotal(j))}</div>
-      <div class="meta">${esc(j.customer||"")}</div></div>
-      <div class="gph">${gph!=null?gbp(gph)+"/h":"—"}</div></div>
-      ${j.comeback?'<span class="pill cb">comeback</span>':''}${under?'<span class="pill under">over estimate</span>':''}
-      <div class="meta" style="margin-top:9px; color:var(--accent2);">Tap to edit ›</div>`;
-    d.onclick=()=>editJob(j.id);
-    list.appendChild(d);
-  });
+  arr.forEach(j=>list.appendChild(jobCard(j)));
 }
 
 /* ---------- stats (split multi-type jobs evenly) ---------- */
 function renderStats(){
   const sum=$("#statsSummary");
-  if(!jobs.length){ sum.innerHTML='<div class="empty">No data yet. Stats appear after you log jobs.</div>';
+  const C=jobs.filter(j=>Number(j.actualMins)>0);
+  if(!C.length){ sum.innerHTML='<div class="empty">No completed jobs yet. Stats appear once jobs have their time logged.</div>';
     $("#statsByType").innerHTML=""; $("#statsQuote").innerHTML=""; return; }
-  const tGP=jobs.reduce((a,j)=>a+jobGP(j),0), tH=jobs.reduce((a,j)=>a+hrs(j.actualMins),0);
-  const tRev=jobs.reduce((a,j)=>a+jobTotal(j),0);
-  const tPP=jobs.reduce((a,j)=>a+jobPartsProfit(j),0);
-  const tLab=jobs.reduce((a,j)=>a+(Number(j.labourCharged)||0),0);
-  const avg=tH>0?tGP/tH:0, cb=jobs.filter(j=>j.comeback).length;
+  const tGP=C.reduce((a,j)=>a+jobGP(j),0), tH=C.reduce((a,j)=>a+hrs(j.actualMins),0);
+  const tRev=C.reduce((a,j)=>a+jobTotal(j),0);
+  const tPP=C.reduce((a,j)=>a+jobPartsProfit(j),0);
+  const tLab=C.reduce((a,j)=>a+(Number(j.labourCharged)||0),0);
+  const avg=tH>0?tGP/tH:0, cb=C.filter(j=>j.comeback).length;
   sum.innerHTML=`
     <div class="stat"><span>Avg gross profit / hour</span><span class="v">${gbp(avg)}</span></div>
     <div class="stat"><span>Total gross profit</span><span class="v">${gbp(tGP)}</span></div>
@@ -637,12 +652,12 @@ function renderStats(){
     <div class="stat"><span>Hours on the tools</span><span class="v">${tH.toFixed(1)}h</span></div>
     <div class="stat"><span>Comebacks</span><span class="v">${cb}</span></div>`;
   const byType={};
-  jobs.forEach(j=>{ const ts=jobTypesOf(j); const n=ts.length; const gpE=jobGP(j)/n, hE=hrs(j.actualMins)/n;
+  C.forEach(j=>{ const ts=jobTypesOf(j); const n=ts.length; const gpE=jobGP(j)/n, hE=hrs(j.actualMins)/n;
     ts.forEach(t=>{ (byType[t]=byType[t]||{gp:0,h:0,n:0}); byType[t].gp+=gpE; byType[t].h+=hE; byType[t].n++; }); });
   const rows=Object.entries(byType).map(([t,v])=>({t,gph:v.h>0?v.gp/v.h:0,n:v.n})).sort((a,b)=>b.gph-a.gph);
   const max=Math.max(...rows.map(r=>r.gph),1);
   $("#statsByType").innerHTML=rows.map(r=>`<div class="barRow"><div class="h"><span>${esc(r.t)} <span class="muted">(${r.n})</span></span><span>${gbp(r.gph)}/h</span></div><div class="bar"><span style="width:${Math.max(4,r.gph/max*100)}%"></span></div></div>`).join("");
-  const q=jobs.filter(j=>j.quotedHours>0);
+  const q=C.filter(j=>j.quotedHours>0);
   if(!q.length){ $("#statsQuote").innerHTML='<div class="muted">Add "estimated at start" to jobs to see where you under-estimate.</div>'; return; }
   const qt={}; q.forEach(j=>{ const ts=jobTypesOf(j); const n=ts.length;
     ts.forEach(t=>{ (qt[t]=qt[t]||{q:0,a:0,n:0}); qt[t].q+=j.quotedHours/n; qt[t].a+=hrs(j.actualMins)/n; qt[t].n++; }); });
