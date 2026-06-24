@@ -246,9 +246,6 @@
         <textarea id="notes" rows="2" placeholder="Anything worth remembering"></textarea>
       </div>
 
-      <label>Flag</label>
-      <div class="chips"><span class="chip cb" id="comebackChip">⚠ Comeback / redo</span></div>
-
       <button class="btn green" id="saveBtn" style="margin-top:20px;">Save job</button>
       <button class="btn blue" id="completeBtn">Mark complete ✓</button>
       <button class="btn grey" id="cancelBtn" style="display:none;">Cancel edit</button>
@@ -794,7 +791,7 @@ function editJob(id){
   const j=jobs.find(x=>x.id===id); if(!j) return;
   editingId=id; selTypes=jobTypesOf(j).slice(); comeback=!!j.comeback; selCustomerId=j.customerId||null;
   swReset();
-  buildChips(); $("#comebackChip").classList.toggle("on", comeback);
+  buildChips();
   $("#jobDate").value=j.date;
   $("#hrs").value=Math.floor(j.actualMins/60)||""; $("#mins").value=j.actualMins%60||"";
   $("#labourCharged").value=j.labourCharged||""; $("#partsCharged").value=j.partsCharged||""; $("#partsCost").value=j.partsCost||"";
@@ -836,7 +833,6 @@ function clearForm(){
   ["hrs","mins","labourCharged","partsCharged","partsCost","make","model","customer","phone","reg","notes","smallDesc","motWork","motCostUs","motCostCustomer"].forEach(id=>$("#"+id).value="");
   $("#customerCars").innerHTML=""; setMotResult(null); $("#regAge").textContent="";
   $("#jobDate").value=today();
-  $("#comebackChip").classList.remove("on");
   buildChips(); toggleSmallDesc(); toggleMot();
   $("#saveBtn").textContent="Save job"; $("#cancelBtn").style.display="none"; $("#deleteBtn").style.display="none";
   const cb=$("#completeBtn"); cb.textContent="Mark complete ✓"; cb.className="btn blue"; cb._reopen=false;
@@ -857,7 +853,7 @@ function jobCard(j){
     <div class="meta">${esc(veh)||"—"}${j.reg?" · "+esc(j.reg):""}${Number(j.actualMins)>0?" · "+j.actualMins+"min":""} · ${gbp(jobTotal(j))}</div>
     <div class="meta">${esc(j.customer||"")}${open?(j.customer?" · ":"")+fmtDate(j.date):""}</div></div>
     <div class="gph">${open?'<span style="color:var(--warn); font-size:.85rem;">open ›</span>':(gph!=null?gbp(gph)+"/h":"—")}</div></div>
-    ${j.comeback?'<span class="pill cb">comeback</span>':''}${open?'<span class="pill under">open</span>':''}
+    ${open?'<span class="pill under">open</span>':''}
     <div class="meta" style="margin-top:9px; color:var(--accent2);">${open?"Tap to finish ›":"Tap for breakdown ›"}</div>`;
   d.onclick=()=> open ? editJob(j.id) : openBreakdown(j.id);
   return d;
@@ -945,8 +941,7 @@ function renderStats(){
     <div class="stat"><span>&nbsp;&nbsp;↳ from labour</span><span class="v">${gbp(tLab)}</span></div>
     <div class="stat"><span>&nbsp;&nbsp;↳ from parts markup</span><span class="v">${gbp(tPP)}</span></div>
     <div class="stat"><span>Total charged</span><span class="v">${gbp(tRev)}</span></div>
-    <div class="stat"><span>Hours on the tools</span><span class="v">${tH.toFixed(1)}h</span></div>
-    <div class="stat"><span>Comebacks</span><span class="v">${cb}</span></div>`;
+    <div class="stat"><span>Hours on the tools</span><span class="v">${tH.toFixed(1)}h</span></div>`;
   const byType={};
   C.forEach(j=>{ const ts=jobTypesOf(j); const n=ts.length; const gpE=jobGP(j)/n, hE=hrs(j.actualMins)/n;
     ts.forEach(t=>{ (byType[t]=byType[t]||{gp:0,h:0,n:0}); byType[t].gp+=gpE; byType[t].h+=hE; byType[t].n++; }); });
@@ -1149,7 +1144,6 @@ $("#dupCancel").onclick=closeDupModal;
 $("#askOk").onclick=()=>askCb&&askCb(true);
 $("#askCancel").onclick=()=>askCb&&askCb(false);
 $("#askInput").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); askCb&&askCb(true); } });
-$("#comebackChip").onclick=function(){ comeback=!comeback; this.classList.toggle("on",comeback); };
 $("#exportBtn").onclick=exportCSV;
 $("#cogBtn").onclick=function(){ showView("settings"); };
 $("#settingsBack").onclick=function(){ showView("log"); };
