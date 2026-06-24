@@ -169,6 +169,10 @@
 
       <label>Job type <span class="opt">(tap all that apply)</span></label>
       <div class="chips" id="jobTypeChips"></div>
+      <div id="smallDescBlock" style="display:none;">
+        <label>What was the job?</label>
+        <textarea id="smallDesc" rows="2" placeholder="Describe the small / odd job"></textarea>
+      </div>
 
       <label>Time spent</label>
       <div class="row">
@@ -227,8 +231,10 @@
         <div class="unit"><input id="estMins" type="number" inputmode="numeric" min="0" max="59" placeholder="0" /><b>min</b></div>
       </div>
 
-      <label>Notes</label>
-      <textarea id="notes" rows="2" placeholder="Anything worth remembering"></textarea>
+      <div id="notesBlock">
+        <label>Notes</label>
+        <textarea id="notes" rows="2" placeholder="Anything worth remembering"></textarea>
+      </div>
 
       <label>Flag</label>
       <div class="chips"><span class="chip cb" id="comebackChip">⚠ Comeback / redo</span></div>
@@ -318,7 +324,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 /* ---------- config ---------- */
-const JOB_TYPES = ["Service","Brakes","Clutch","Cambelt/Timing","Diagnostics","Suspension",
+const JOB_TYPES = ["Small job","Service","Brakes","Clutch","Cambelt/Timing","Diagnostics","Suspension",
   "Exhaust","Tyres","Battery/Electrical","Aircon","MOT repair","Engine","Welding"];
 const MAKES_SEED = ["Audi","BMW","Citroën","Dacia","Fiat","Ford","Honda","Hyundai","Jaguar","Kia",
   "Land Rover","Lexus","Mazda","Mercedes-Benz","MG","MINI","Nissan","Peugeot","Renault","SEAT",
@@ -375,7 +381,7 @@ function buildChips(){
   const tc=$("#jobTypeChips"); tc.innerHTML="";
   allJobTypes().forEach(t=>{
     const c=document.createElement("span"); c.className="chip"+(selTypes.includes(t)?" on":""); c.textContent=t;
-    c.onclick=()=>{ const i=selTypes.indexOf(t); if(i>=0) selTypes.splice(i,1); else selTypes.push(t); c.classList.toggle("on"); };
+    c.onclick=()=>{ const i=selTypes.indexOf(t); if(i>=0) selTypes.splice(i,1); else selTypes.push(t); c.classList.toggle("on"); toggleSmallDesc(); };
     tc.appendChild(c);
   });
   const other=document.createElement("span"); other.className="chip add"; other.textContent="+ Other";
@@ -388,6 +394,13 @@ function buildChips(){
 function updateAge(){ const r=$("#ageRange"); const v=+r.value;
   $("#ageOut").textContent = v>=40 ? "40+ yrs" : v+(v===1?" yr":" yrs");
   r.style.setProperty("--fill", ((v-1)/39*100)+"%"); }
+function isSmallSelected(){ return selTypes.some(t=>t.toLowerCase()==="small job"); }
+function toggleSmallDesc(){
+  const on=isSmallSelected();
+  $("#smallDescBlock").style.display=on?"block":"none";
+  $("#notesBlock").style.display=on?"none":"block";
+  if(on) $("#smallDesc").value=$("#notes").value;
+}
 
 /* ---------- combobox ---------- */
 function attachCombo(input, list, optionsFn, onPick, otherLabel){
@@ -554,6 +567,7 @@ function editJob(id){
   $("#ageRange").value=j.ageYears||10; updateAge();
   const qm=Math.round((j.quotedHours||0)*60); $("#estHrs").value=Math.floor(qm/60)||""; $("#estMins").value=qm%60||"";
   $("#notes").value=j.notes||"";
+  toggleSmallDesc();
   renderCustomerCars();
   $("#saveBtn").textContent="Update job"; $("#cancelBtn").style.display="flex"; $("#deleteBtn").style.display="flex";
   showView("log");
@@ -569,11 +583,11 @@ function deleteJob(){
 }
 function clearForm(){
   selTypes=[]; comeback=false; editingId=null; selCustomerId=null; pending=null;
-  ["hrs","mins","labourCharged","partsCharged","partsCost","make","model","estHrs","estMins","customer","phone","reg","notes"].forEach(id=>$("#"+id).value="");
+  ["hrs","mins","labourCharged","partsCharged","partsCost","make","model","estHrs","estMins","customer","phone","reg","notes","smallDesc"].forEach(id=>$("#"+id).value="");
   $("#customerCars").innerHTML="";
   $("#jobDate").value=today();
   $("#ageRange").value=10; updateAge(); $("#comebackChip").classList.remove("on");
-  buildChips();
+  buildChips(); toggleSmallDesc();
   $("#saveBtn").textContent="Save job"; $("#cancelBtn").style.display="none"; $("#deleteBtn").style.display="none";
   window.scrollTo({top:0,behavior:"smooth"});
 }
@@ -739,6 +753,7 @@ $("#customer").addEventListener("input", ()=>{ const c=getCustomer(selCustomerId
   if(!c || c.name.toLowerCase()!==$("#customer").value.trim().toLowerCase()){ selCustomerId=null; $("#customerCars").innerHTML=""; } });
 $("#reg").addEventListener("input", function(){ const p=this.selectionStart; this.value=this.value.toUpperCase(); this.setSelectionRange&&this.setSelectionRange(p,p); });
 $("#ageRange").addEventListener("input", updateAge);
+$("#smallDesc").addEventListener("input",function(){ $("#notes").value=this.value; });
 $("#scanBtn").onclick=()=>$("#invFile").click();
 $("#invFile").onchange=function(){ if(this.files&&this.files[0]) scanInvoice(this.files[0]); this.value=""; };
 $("#saveBtn").onclick=saveJob;
