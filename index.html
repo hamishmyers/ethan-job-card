@@ -157,6 +157,12 @@
     <div class="sub">Fill it in when the job's done</div>
 
     <div class="card">
+      <button class="btn blue" id="scanBtn">📷 Scan an invoice</button>
+      <div class="hint-inline" style="text-align:center; margin-bottom:4px;">Photograph the invoice to auto-fill, then just add your time</div>
+      <input type="file" accept="image/*" capture="environment" id="invFile" style="display:none" />
+
+      <div class="divider">Or enter manually</div>
+
       <label>Job type <span class="opt">(tap all that apply)</span></label>
       <div class="chips" id="jobTypeChips"></div>
 
@@ -284,6 +290,13 @@
     <div class="sub" id="dupSub"></div>
     <div id="dupOptions"></div>
     <button class="btn grey" id="dupCancel" style="margin-top:4px;">Cancel</button>
+  </div>
+</div>
+
+<div class="modal" id="scanModal">
+  <div class="modal-card" style="text-align:center;">
+    <h3 id="scanMsg">Reading invoice…</h3>
+    <div class="sub">Pulling out the details, one sec</div>
   </div>
 </div>
 
@@ -484,6 +497,45 @@ function showConfirm(title, msg, cb){
   $("#askModal").classList.add("open");
 }
 function closeAsk(){ $("#askModal").classList.remove("open"); askCb=null; }
+
+/* ---------- invoice scan ---------- */
+function fileToResizedB64(file, maxDim, cb){
+  const img=new Image(); const url=URL.createObjectURL(file);
+  img.onload=()=>{ URL.revokeObjectURL(url);
+    let w=img.naturalWidth, h=img.naturalHeight; const s=Math.min(1, maxDim/Math.max(w,h));
+    w=Math.round(w*s); h=Math.round(h*s);
+    const c=document.createElement("canvas"); c.width=w; c.height=h;
+    c.getContext("2d").drawImage(img,0,0,w,h);
+    cb(c.toDataURL("image/jpeg",0.82).split(",")[1]); };
+  img.onerror=()=>cb(null); img.src=url;
+}
+function scanInvoice(file){
+  if(!file) return;
+  $("#scanModal").classList.add("open");
+  fileToResizedB64(file, 1600, async (b64)=>{
+    if(!b64){ closeScan(); toast("Couldn't read that image"); return; }
+    try{
+      const r=await fetch("/api/scan",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({image:b64, media_type:"image/jpeg"})});
+      const d=await r.json();
+      closeScan();
+      if(!r.ok){ toast(d.error||"Scan failed"); return; }
+      applyScan(d); toast("Scanned — check the details");
+    }catch(e){ closeScan(); toast("Scan failed — check connection"); }
+  });
+}
+function closeScan(){ $("#scanModal").classList.remove("open"); }
+function applyScan(d){
+  if(!d || typeof d!=="object") return;
+  if(d.customer_name){ $("#customer").value=d.customer_name; onPickCustomer(d.customer_name); }
+  if(d.registration) $("#reg").value=String(d.registration).toUpperCase();
+  if(d.make) $("#make").value=d.make;
+  if(d.model) $("#model").value=d.model;
+  if(d.date && /^\d{4}-\d{2}-\d{2}$/.test(d.date)) $("#jobDate").value=d.date;
+  if(d.work_done) $("#notes").value=d.work_done;
+  if(d.labour_charged!=null && d.labour_charged!=="") $("#labourCharged").value=d.labour_charged;
+  if(d.parts_charged!=null && d.parts_charged!=="") $("#partsCharged").value=d.parts_charged;
+  window.scrollTo({top:0,behavior:"smooth"});
+}
 function editJob(id){
   const j=jobs.find(x=>x.id===id); if(!j) return;
   editingId=id; selTypes=jobTypesOf(j).slice(); comeback=!!j.comeback; selCustomerId=j.customerId||null;
@@ -667,6 +719,8 @@ $("#customer").addEventListener("input", ()=>{ const c=getCustomer(selCustomerId
   if(!c || c.name.toLowerCase()!==$("#customer").value.trim().toLowerCase()){ selCustomerId=null; $("#customerCars").innerHTML=""; } });
 $("#reg").addEventListener("input", function(){ const p=this.selectionStart; this.value=this.value.toUpperCase(); this.setSelectionRange&&this.setSelectionRange(p,p); });
 $("#ageRange").addEventListener("input", updateAge);
+$("#scanBtn").onclick=()=>$("#invFile").click();
+$("#invFile").onchange=function(){ if(this.files&&this.files[0]) scanInvoice(this.files[0]); this.value=""; };
 $("#saveBtn").onclick=saveJob;
 $("#cancelBtn").onclick=function(){ clearForm(); showView("jobs"); };
 $("#deleteBtn").onclick=deleteJob;
