@@ -353,7 +353,7 @@ const SUPA_DEFAULT = { url:"https://gvyvjfldvbwdiexjyxzh.supabase.co", key:"sb_p
 let jobs = load(LS_JOBS, []);
 let customers = load(LS_CUST, []);
 let customMakes = load(LS_MAKES, []), customModels = load(LS_MODELS, []), customTypes = load(LS_TYPES, []);
-let selTypes=[], comeback=false, editingId=null, viewDate=null, selCustomerId=null, pending=null, selMot=null;
+let selTypes=[], comeback=false, editingId=null, viewDate=null, selCustomerId=null, pending=null, selMot=null, ageSet=false;
 let supa = load(LS_SUPA, SUPA_DEFAULT);
 if(!supa.url || !supa.key){ supa = SUPA_DEFAULT; save(LS_SUPA, supa); }
 let sb = null;
@@ -409,8 +409,8 @@ function buildChips(){
   tc.appendChild(other);
 }
 function updateAge(){ const r=$("#ageRange"); const v=+r.value;
-  $("#ageOut").textContent = v>=40 ? "40+ yrs" : v+(v===1?" yr":" yrs");
-  r.style.setProperty("--fill", ((v-1)/39*100)+"%"); }
+  $("#ageOut").textContent = ageSet ? (v>=40 ? "40+ yrs" : v+(v===1?" yr":" yrs")) : "Not set";
+  r.style.setProperty("--fill", ageSet ? ((v-1)/39*100)+"%" : "0%"); }
 function isSmallSelected(){ return selTypes.some(t=>t.toLowerCase()==="small job"); }
 function toggleSmallDesc(){
   const on=isSmallSelected();
@@ -475,7 +475,7 @@ function saveJob(){
   pending={ date:$("#jobDate").value||today(),
     jobTypes:selTypes.slice(), jobType:selTypes.join(" + "), actualMins:mins,
     labourCharged:num("labourCharged"), partsCharged:num("partsCharged"), partsCost:num("partsCost"),
-    make:$("#make").value.trim(), model:$("#model").value.trim(), ageYears:+$("#ageRange").value,
+    make:$("#make").value.trim(), model:$("#model").value.trim(), ageYears:(ageSet?+$("#ageRange").value:null),
     quotedHours:(num("estHrs")*60+num("estMins"))/60,
     customer:$("#customer").value.trim(), reg:$("#reg").value.trim().toUpperCase(),
     notes:$("#notes").value.trim(), comeback:comeback,
@@ -595,7 +595,7 @@ function editJob(id){
   $("#customer").value=j.customer||""; $("#reg").value=j.reg||"";
   const lc=getCustomer(j.customerId); $("#phone").value=(lc&&lc.phone)?lc.phone:"";
   $("#make").value=j.make||""; $("#model").value=j.model||"";
-  $("#ageRange").value=j.ageYears||10; updateAge();
+  ageSet=Number(j.ageYears)>0; $("#ageRange").value=j.ageYears||10; updateAge();
   const qm=Math.round((j.quotedHours||0)*60); $("#estHrs").value=Math.floor(qm/60)||""; $("#estMins").value=qm%60||"";
   $("#notes").value=j.notes||"";
   $("#motWork").value=j.motWork||""; $("#motCostUs").value=j.motCostUs||""; $("#motCostCustomer").value=j.motCostCustomer||"";
@@ -619,7 +619,7 @@ function clearForm(){
   ["hrs","mins","labourCharged","partsCharged","partsCost","make","model","estHrs","estMins","customer","phone","reg","notes","smallDesc","motWork","motCostUs","motCostCustomer"].forEach(id=>$("#"+id).value="");
   $("#customerCars").innerHTML=""; setMotResult(null);
   $("#jobDate").value=today();
-  $("#ageRange").value=10; updateAge(); $("#comebackChip").classList.remove("on");
+  ageSet=false; $("#ageRange").value=10; updateAge(); $("#comebackChip").classList.remove("on");
   buildChips(); toggleSmallDesc(); toggleMot();
   $("#saveBtn").textContent="Save job"; $("#cancelBtn").style.display="none"; $("#deleteBtn").style.display="none";
   window.scrollTo({top:0,behavior:"smooth"});
@@ -787,7 +787,7 @@ attachCombo($("#customer"), $("#customerList"), ()=>uniqSort(customers.map(c=>c.
 $("#customer").addEventListener("input", ()=>{ const c=getCustomer(selCustomerId);
   if(!c || c.name.toLowerCase()!==$("#customer").value.trim().toLowerCase()){ selCustomerId=null; $("#customerCars").innerHTML=""; } });
 $("#reg").addEventListener("input", function(){ const p=this.selectionStart; this.value=this.value.toUpperCase(); this.setSelectionRange&&this.setSelectionRange(p,p); });
-$("#ageRange").addEventListener("input", updateAge);
+$("#ageRange").addEventListener("input", ()=>{ ageSet=true; updateAge(); });
 $("#smallDesc").addEventListener("input",function(){ $("#notes").value=this.value; });
 $("#motResultChips").addEventListener("click",function(e){ const c=e.target.closest(".chip"); if(!c) return; setMotResult(selMot===c.dataset.mot?null:c.dataset.mot); });
 $("#scanBtn").onclick=()=>$("#invFile").click();
