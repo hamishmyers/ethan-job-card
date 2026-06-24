@@ -190,13 +190,7 @@
         </div>
       </div>
 
-      <label>Estimated at start <span class="opt">(your guess before you begin)</span></label>
-      <div class="row">
-        <div class="unit"><input id="estHrs" type="number" inputmode="numeric" min="0" placeholder="0" /><b>hrs</b></div>
-        <div class="unit"><input id="estMins" type="number" inputmode="numeric" min="0" max="59" placeholder="0" /><b>min</b></div>
-      </div>
-
-      <label>Actual time spent <span class="opt">(add at the end)</span></label>
+      <label>Time spent <span class="opt">(add when you finish)</span></label>
       <div class="row">
         <div class="unit"><input id="hrs" type="number" inputmode="numeric" min="0" placeholder="0" /><b>hrs</b></div>
         <div class="unit"><input id="mins" type="number" inputmode="numeric" min="0" max="59" placeholder="0" /><b>min</b></div>
@@ -228,6 +222,7 @@
 
       <label>Registration <span class="opt">(number plate)</span></label>
       <input id="reg" placeholder="e.g. AB12 CDE" autocomplete="off" style="text-transform:uppercase;" />
+      <div class="hint-inline" id="regAge"></div>
 
       <label>Make</label>
       <div class="combo">
@@ -241,12 +236,6 @@
         <div class="combo-list" id="modelList"></div>
       </div>
 
-      <label>Vehicle age</label>
-      <div class="slider">
-        <input id="ageRange" type="range" min="1" max="40" value="10" />
-        <output id="ageOut">10 yrs</output>
-      </div>
-
       <div id="notesBlock">
         <label>Notes</label>
         <textarea id="notes" rows="2" placeholder="Anything worth remembering"></textarea>
@@ -256,6 +245,7 @@
       <div class="chips"><span class="chip cb" id="comebackChip">⚠ Comeback / redo</span></div>
 
       <button class="btn green" id="saveBtn" style="margin-top:20px;">Save job</button>
+      <button class="btn blue" id="completeBtn">Mark complete ✓</button>
       <button class="btn grey" id="cancelBtn" style="display:none;">Cancel edit</button>
       <button class="btn red" id="deleteBtn" style="display:none;">Delete this job</button>
     </div>
@@ -265,6 +255,11 @@
   <section id="view-jobs" style="display:none;">
     <h1>Jobs</h1>
     <div class="sub" id="jobsCount">No jobs yet</div>
+    <div class="chips" id="jobFilter" style="margin-bottom:14px;">
+      <span class="chip on" data-f="all">All</span>
+      <span class="chip" data-f="open">Open</span>
+      <span class="chip" data-f="closed">Completed</span>
+    </div>
     <div id="jobsList"></div>
   </section>
 
@@ -276,10 +271,6 @@
     <div class="card">
       <div class="muted" style="font-size:.78rem; text-transform:uppercase; letter-spacing:.05em; margin-bottom:8px;">Gross profit / hour by job type</div>
       <div id="statsByType"></div>
-    </div>
-    <div class="card">
-      <div class="muted" style="font-size:.78rem; text-transform:uppercase; letter-spacing:.05em; margin-bottom:8px;">Estimate accuracy</div>
-      <div id="statsQuote"></div>
     </div>
   </section>
 
@@ -370,6 +361,16 @@
   </div>
 </div>
 
+<div class="modal" id="breakdownModal">
+  <div class="modal-card">
+    <h3 id="bdTitle">Job breakdown</h3>
+    <div class="sub" id="bdSub"></div>
+    <div id="bdBody"></div>
+    <button class="btn blue" id="bdEditBtn" style="margin-top:8px;">Edit job</button>
+    <button class="btn grey" id="bdCloseBtn">Close</button>
+  </div>
+</div>
+
 <div class="modal" id="askModal">
   <div class="modal-card">
     <h3 id="askTitle"></h3>
@@ -401,7 +402,8 @@ let customers = load(LS_CUST, []);
 let purchases = load("joblog.purchases.v1", []);
 let editingPurchaseId = null;
 let customMakes = load(LS_MAKES, []), customModels = load(LS_MODELS, []), customTypes = load(LS_TYPES, []);
-let selTypes=[], comeback=false, editingId=null, viewDate=null, selCustomerId=null, pending=null, selMot=null, ageSet=false;
+let selTypes=[], comeback=false, editingId=null, viewDate=null, selCustomerId=null, pending=null, selMot=null, jobFilter="all";
+let usage=load("joblog.usage.v1",{}), bdJobId=null;
 let supa = load(LS_SUPA, SUPA_DEFAULT);
 if(!supa.url || !supa.key){ supa = SUPA_DEFAULT; save(LS_SUPA, supa); }
 let sb = null;
@@ -442,9 +444,18 @@ function addCar(custId, car){ const c=getCustomer(custId); if(!c) return; if(!c.
   else if(!car.reg && (car.make||car.model) && !c.cars.length){ c.cars.push(car); save(LS_CUST,customers); } }
 
 /* ---------- chips (multi-select job type) ---------- */
+const PINNED_TYPES=["mot","brakes","service","tyres"];
+function orderedTypes(){
+  const canon=["MOT","Brakes","Service","Tyres"];
+  const all=allJobTypes();
+  const pinned=canon.filter(p=>all.some(t=>t.toLowerCase()===p.toLowerCase()));
+  const rest=all.filter(t=>!canon.some(p=>p.toLowerCase()===t.toLowerCase()))
+    .sort((a,b)=>((usage[b.toLowerCase()]||0)-(usage[a.toLowerCase()]||0)) || a.localeCompare(b));
+  return pinned.concat(rest);
+}
 function buildChips(){
   const tc=$("#jobTypeChips"); tc.innerHTML="";
-  allJobTypes().forEach(t=>{
+  orderedTypes().forEach(t=>{
     const c=document.createElement("span"); c.className="chip"+(selTypes.includes(t)?" on":""); c.textContent=t;
     c.onclick=()=>{ const i=selTypes.indexOf(t); if(i>=0) selTypes.splice(i,1); else selTypes.push(t); c.classList.toggle("on"); toggleSmallDesc(); toggleMot(); };
     tc.appendChild(c);
@@ -457,19 +468,31 @@ function buildChips(){
   tc.appendChild(other);
   filterChips();
 }
-const PINNED_TYPES=["small job","service","mot"];
 function filterChips(){
   const q=($("#typeSearch")?$("#typeSearch").value:"").trim().toLowerCase();
   [...$("#jobTypeChips").children].forEach(c=>{
     if(c.classList.contains("add")){ c.style.display="flex"; return; }
     const t=(c.textContent||"").toLowerCase();
-    const show = !q || t.includes(q) || PINNED_TYPES.includes(t) || c.classList.contains("on");
+    const show = q ? (t.includes(q)||PINNED_TYPES.includes(t)||c.classList.contains("on"))
+                   : (PINNED_TYPES.includes(t)||c.classList.contains("on"));
     c.style.display = show ? "flex" : "none";
   });
 }
-function updateAge(){ const r=$("#ageRange"); const v=+r.value;
-  $("#ageOut").textContent = ageSet ? (v>=40 ? "40+ yrs" : v+(v===1?" yr":" yrs")) : "Not set";
-  r.style.setProperty("--fill", ageSet ? ((v-1)/39*100)+"%" : "0%"); }
+function ukPlateAge(reg){
+  const r=(reg||"").toUpperCase().replace(/\s+/g,"");
+  const m=r.match(/^[A-Z]{2}(\d{2})[A-Z]{3}$/); if(!m) return null;
+  const n=parseInt(m[1],10); let year,month;
+  if(n>=1&&n<=49){ year=2000+n; month=3; }
+  else if(n>=51&&n<=99){ year=2000+(n-50); month=9; }
+  else return null;
+  const now=new Date(); let age=now.getFullYear()-year;
+  if(now.getMonth()+1<month) age-=1;
+  return age<0?null:age;
+}
+function showRegAge(){
+  const reg=$("#reg").value; const a=ukPlateAge(reg);
+  $("#regAge").textContent = a!=null ? "≈ "+a+" yr"+(a===1?"":"s")+" old (from plate)" : (reg.trim()? "Private / non-standard plate — age not set" : "");
+}
 function isSmallSelected(){ return selTypes.some(t=>t.toLowerCase()==="small job"); }
 function toggleSmallDesc(){
   const on=isSmallSelected();
@@ -527,19 +550,23 @@ function onPickCustomer(name){ const m=customersByName(name);
   if(m.length===1){ selCustomerId=m[0].id; $("#phone").value=m[0].phone||""; renderCustomerCars(); } else { selCustomerId=null; $("#customerCars").innerHTML=""; } }
 
 /* ---------- save / edit / delete ---------- */
-function saveJob(){
+function saveJob(markComplete){
   if(!selTypes.length){ toast("Pick at least one job type"); return; }
   const mins = num("hrs")*60 + num("mins");
   persistCustom();
+  let closed;
+  if(markComplete===true) closed=true;
+  else if(editingId){ const ej=jobs.find(x=>x.id===editingId); closed=!!(ej&&ej.closed); }
+  else closed=false;
   pending={ date:$("#jobDate").value||today(),
     jobTypes:selTypes.slice(), jobType:selTypes.join(" + "), actualMins:mins,
     labourCharged:num("labourCharged"), partsCharged:num("partsCharged"), partsCost:num("partsCost"),
-    make:$("#make").value.trim(), model:$("#model").value.trim(), ageYears:(ageSet?+$("#ageRange").value:null),
-    quotedHours:(num("estHrs")*60+num("estMins"))/60,
+    make:$("#make").value.trim(), model:$("#model").value.trim(), ageYears:ukPlateAge($("#reg").value),
     customer:$("#customer").value.trim(), reg:$("#reg").value.trim().toUpperCase(),
-    notes:$("#notes").value.trim(), comeback:comeback,
+    notes:$("#notes").value.trim(), comeback:comeback, closed:closed,
     motResult:(isMotSelected()?selMot:null), motWork:(isMotSelected()?$("#motWork").value.trim():""),
     motCostUs:(isMotSelected()?num("motCostUs"):0), motCostCustomer:(isMotSelected()?num("motCostCustomer"):0) };
+  selTypes.forEach(t=>{ const k=t.toLowerCase(); usage[k]=(usage[k]||0)+1; }); save("joblog.usage.v1",usage);
   resolveCustomerThenSave();
 }
 function resolveCustomerThenSave(){
@@ -561,8 +588,8 @@ function commitSave(customerId, createNew){
   pending.customerId=customerId||"";
   const wasEditing=editingId;
   const open=jobOpen(pending);
-  if(editingId){ const j=jobs.find(x=>x.id===editingId); if(j){ Object.assign(j,pending); j.synced=false; if(sb)pushOne(j); } toast(open?"Saved — add time to finish":"Updated ✓"); }
-  else{ const j={ id:uid(), createdAt:new Date().toISOString(), ...pending, synced:false }; jobs.unshift(j); if(sb)pushOne(j); toast(open?"Saved — add time to finish":"Saved ✓"); }
+  if(editingId){ const j=jobs.find(x=>x.id===editingId); if(j){ Object.assign(j,pending); j.synced=false; if(sb)pushOne(j); } toast(open?"Saved — still open":"Updated ✓"); }
+  else{ const j={ id:uid(), createdAt:new Date().toISOString(), ...pending, synced:false }; jobs.unshift(j); if(sb)pushOne(j); toast(open?"Saved — open":"Saved & completed ✓"); }
   save(LS_JOBS,jobs); closeDupModal(); clearForm(); renderJobs(); renderStats();
   if(wasEditing) showView("jobs");
 }
@@ -718,15 +745,26 @@ function editJob(id){
   $("#customer").value=j.customer||""; $("#reg").value=j.reg||"";
   const lc=getCustomer(j.customerId); $("#phone").value=(lc&&lc.phone)?lc.phone:"";
   $("#make").value=j.make||""; $("#model").value=j.model||"";
-  ageSet=Number(j.ageYears)>0; $("#ageRange").value=j.ageYears||10; updateAge();
-  const qm=Math.round((j.quotedHours||0)*60); $("#estHrs").value=Math.floor(qm/60)||""; $("#estMins").value=qm%60||"";
+  showRegAge();
   $("#notes").value=j.notes||"";
   $("#motWork").value=j.motWork||""; $("#motCostUs").value=j.motCostUs||""; $("#motCostCustomer").value=j.motCostCustomer||"";
   setMotResult(j.motResult||null);
   toggleSmallDesc(); toggleMot();
   renderCustomerCars();
   $("#saveBtn").textContent="Update job"; $("#cancelBtn").style.display="flex"; $("#deleteBtn").style.display="flex";
+  setCompleteBtn();
   showView("log");
+}
+function setCompleteBtn(){
+  const ej=editingId?jobs.find(x=>x.id===editingId):null;
+  const b=$("#completeBtn");
+  if(ej && ej.closed){ b.textContent="Re-open job"; b.className="btn grey"; b._reopen=true; }
+  else { b.textContent="Mark complete ✓"; b.className="btn blue"; b._reopen=false; }
+}
+function reopenJob(){
+  if(!editingId) return; const j=jobs.find(x=>x.id===editingId);
+  if(j){ j.closed=false; j.synced=false; save(LS_JOBS,jobs); if(sb)pushOne(j); }
+  clearForm(); renderJobs(); renderStats(); toast("Re-opened"); showView("jobs");
 }
 function deleteJob(){
   if(!editingId) return;
@@ -739,58 +777,77 @@ function deleteJob(){
 }
 function clearForm(){
   selTypes=[]; comeback=false; editingId=null; selCustomerId=null; pending=null; selMot=null;
-  ["hrs","mins","labourCharged","partsCharged","partsCost","make","model","estHrs","estMins","customer","phone","reg","notes","smallDesc","motWork","motCostUs","motCostCustomer"].forEach(id=>$("#"+id).value="");
-  $("#customerCars").innerHTML=""; setMotResult(null);
+  ["hrs","mins","labourCharged","partsCharged","partsCost","make","model","customer","phone","reg","notes","smallDesc","motWork","motCostUs","motCostCustomer"].forEach(id=>$("#"+id).value="");
+  $("#customerCars").innerHTML=""; setMotResult(null); $("#regAge").textContent="";
   $("#jobDate").value=today();
-  ageSet=false; $("#ageRange").value=10; updateAge(); $("#comebackChip").classList.remove("on");
+  $("#comebackChip").classList.remove("on");
   buildChips(); toggleSmallDesc(); toggleMot();
   $("#saveBtn").textContent="Save job"; $("#cancelBtn").style.display="none"; $("#deleteBtn").style.display="none";
+  const cb=$("#completeBtn"); cb.textContent="Mark complete ✓"; cb.className="btn blue"; cb._reopen=false;
   window.scrollTo({top:0,behavior:"smooth"});
 }
 
 /* ---------- jobs list (grouped by date) ---------- */
 function fmtDate(d){ const dt=new Date(d+"T00:00:00"); return isNaN(dt)?d:dt.toLocaleDateString(undefined,{weekday:"short",day:"numeric",month:"short",year:"numeric"}); }
-function jobOpen(j){
-  if(Number(j.actualMins)>0) return false;
-  const ts=jobTypesOf(j).map(t=>t.toLowerCase());
-  if(ts.length>0 && ts.every(t=>t==="mot")) return false;
-  return true;
-}
+function jobOpen(j){ return !j.closed; }
 function jobCard(j){
   const open=jobOpen(j);
   const gph=jobGPH(j); const veh=[j.make,j.model].filter(Boolean).join(" ");
-  const under=j.quotedHours>0 && hrs(j.actualMins) > j.quotedHours*1.1;
   const d=document.createElement("div"); d.className="job"; d.style.cursor="pointer";
   if(open) d.style.borderColor="rgba(251,191,36,.45)";
   d.innerHTML=`<div class="top">
     <div><div class="ty">${esc(typeLabel(j))}</div>
-    <div class="meta">${esc(veh)||"—"}${j.reg?" · "+esc(j.reg):""}${open?"":" · "+j.actualMins+"min"} · ${gbp(jobTotal(j))}</div>
+    <div class="meta">${esc(veh)||"—"}${j.reg?" · "+esc(j.reg):""}${Number(j.actualMins)>0?" · "+j.actualMins+"min":""} · ${gbp(jobTotal(j))}</div>
     <div class="meta">${esc(j.customer||"")}${open?(j.customer?" · ":"")+fmtDate(j.date):""}</div></div>
-    <div class="gph">${open?'<span style="color:var(--warn); font-size:.85rem;">add time ›</span>':(gph!=null?gbp(gph)+"/h":"—")}</div></div>
-    ${j.comeback?'<span class="pill cb">comeback</span>':''}${under?'<span class="pill under">over estimate</span>':''}${open?'<span class="pill under">needs time</span>':''}
-    <div class="meta" style="margin-top:9px; color:var(--accent2);">${open?"Tap to add time ›":"Tap to edit ›"}</div>`;
-  d.onclick=()=>editJob(j.id);
+    <div class="gph">${open?'<span style="color:var(--warn); font-size:.85rem;">open ›</span>':(gph!=null?gbp(gph)+"/h":"—")}</div></div>
+    ${j.comeback?'<span class="pill cb">comeback</span>':''}${open?'<span class="pill under">open</span>':''}
+    <div class="meta" style="margin-top:9px; color:var(--accent2);">${open?"Tap to finish ›":"Tap for breakdown ›"}</div>`;
+  d.onclick=()=> open ? editJob(j.id) : openBreakdown(j.id);
   return d;
 }
+function openBreakdown(id){
+  const j=jobs.find(x=>x.id===id); if(!j) return;
+  bdJobId=id;
+  $("#bdTitle").textContent=typeLabel(j);
+  const veh=[j.make,j.model].filter(Boolean).join(" ");
+  $("#bdSub").textContent=[j.customer, j.reg, veh, fmtDate(j.date)].filter(Boolean).join(" · ");
+  const cost=(Number(j.partsCost)||0)+(Number(j.motCostUs)||0);
+  const gph=jobGPH(j);
+  $("#bdBody").innerHTML=`
+    <div class="stat"><span>Charged to customer</span><span class="v">${gbp(jobTotal(j))}</span></div>
+    <div class="stat"><span>&nbsp;&nbsp;↳ labour</span><span class="v">${gbp(j.labourCharged||0)}</span></div>
+    <div class="stat"><span>&nbsp;&nbsp;↳ parts</span><span class="v">${gbp(j.partsCharged||0)}</span></div>
+    ${(j.motCostCustomer)?`<div class="stat"><span>&nbsp;&nbsp;↳ MOT</span><span class="v">${gbp(j.motCostCustomer)}</span></div>`:''}
+    <div class="stat"><span>Your cost</span><span class="v">${gbp(cost)}</span></div>
+    <div class="stat"><span>Profit</span><span class="v" style="color:var(--accent)">${gbp(jobGP(j))}</span></div>
+    <div class="stat"><span>Time</span><span class="v">${Number(j.actualMins)>0?j.actualMins+" min":"—"}</span></div>
+    <div class="stat"><span>Profit / hour</span><span class="v">${gph!=null?gbp(gph):"—"}</span></div>`;
+  $("#breakdownModal").classList.add("open");
+}
+function closeBreakdown(){ $("#breakdownModal").classList.remove("open"); }
 function renderJobs(){
   const list=$("#jobsList"); list.innerHTML="";
   if(!jobs.length){ $("#jobsCount").textContent="No jobs yet"; list.innerHTML='<div class="empty">Log your first job and it shows up here.</div>'; return; }
   if(viewDate) renderDay(list); else renderDateList(list);
 }
 function renderDateList(list){
-  const open=jobs.filter(jobOpen);
-  if(open.length){
+  const openJobs=jobs.filter(jobOpen), done=jobs.filter(j=>!jobOpen(j));
+  $("#jobsCount").textContent = `${jobs.length} job${jobs.length>1?"s":""} · ${openJobs.length} open`;
+  if(jobFilter==="open"){
+    if(!openJobs.length){ list.innerHTML='<div class="empty">No open jobs. Nice.</div>'; return; }
+    openJobs.forEach(j=>list.appendChild(jobCard(j))); return;
+  }
+  if(jobFilter==="all" && openJobs.length){
     const h=document.createElement("div"); h.className="sub";
     h.style.cssText="color:var(--warn); font-weight:700; margin:2px 0 10px;";
-    h.textContent="⏱ To finish — add time ("+open.length+")";
+    h.textContent="Open — to finish ("+openJobs.length+")";
     list.appendChild(h);
-    open.forEach(j=>list.appendChild(jobCard(j)));
-    const dv=document.createElement("div"); dv.className="divider"; dv.textContent="Logged"; list.appendChild(dv);
+    openJobs.forEach(j=>list.appendChild(jobCard(j)));
+    const dv=document.createElement("div"); dv.className="divider"; dv.textContent="Completed"; list.appendChild(dv);
   }
-  const done=jobs.filter(j=>!jobOpen(j));
+  if(!done.length){ if(jobFilter==="closed") list.innerHTML='<div class="empty">No completed jobs yet.</div>'; return; }
   const byDate={}; done.forEach(j=>{ (byDate[j.date]=byDate[j.date]||[]).push(j); });
   const dates=Object.keys(byDate).sort((a,b)=>b.localeCompare(a));
-  $("#jobsCount").textContent = `${jobs.length} job${jobs.length>1?"s":""}`+(open.length?` · ${open.length} to finish`:"");
   dates.forEach(d=>{
     const arr=byDate[d];
     const total=arr.reduce((a,j)=>a+jobTotal(j),0), gp=arr.reduce((a,j)=>a+jobGP(j),0);
@@ -817,8 +874,8 @@ function renderStats(){
   const sum=$("#statsSummary");
   const done=jobs.filter(j=>!jobOpen(j));
   const C=done.filter(j=>Number(j.actualMins)>0);
-  if(!done.length){ sum.innerHTML='<div class="empty">No completed jobs yet. Stats appear once jobs are logged.</div>';
-    $("#statsByType").innerHTML=""; $("#statsQuote").innerHTML=""; return; }
+  if(!done.length){ sum.innerHTML='<div class="empty">No completed jobs yet. Mark a job complete and stats appear here.</div>';
+    $("#statsByType").innerHTML=""; return; }
   const tGP=done.reduce((a,j)=>a+jobGP(j),0), tH=C.reduce((a,j)=>a+hrs(j.actualMins),0);
   const tRev=done.reduce((a,j)=>a+jobTotal(j),0);
   const tPP=done.reduce((a,j)=>a+jobPartsProfit(j),0);
@@ -839,14 +896,6 @@ function renderStats(){
   const rows=Object.entries(byType).map(([t,v])=>({t,gph:v.h>0?v.gp/v.h:0,n:v.n})).sort((a,b)=>b.gph-a.gph);
   const max=Math.max(...rows.map(r=>r.gph),1);
   $("#statsByType").innerHTML=rows.map(r=>`<div class="barRow"><div class="h"><span>${esc(r.t)} <span class="muted">(${r.n})</span></span><span>${gbp(r.gph)}/h</span></div><div class="bar"><span style="width:${Math.max(4,r.gph/max*100)}%"></span></div></div>`).join("");
-  const q=C.filter(j=>j.quotedHours>0);
-  if(!q.length){ $("#statsQuote").innerHTML='<div class="muted">Add "estimated at start" to jobs to see where you under-estimate.</div>'; return; }
-  const qt={}; q.forEach(j=>{ const ts=jobTypesOf(j); const n=ts.length;
-    ts.forEach(t=>{ (qt[t]=qt[t]||{q:0,a:0,n:0}); qt[t].q+=j.quotedHours/n; qt[t].a+=hrs(j.actualMins)/n; qt[t].n++; }); });
-  const qr=Object.entries(qt).map(([t,v])=>({t,ratio:v.q>0?v.a/v.q:1,n:v.n})).sort((a,b)=>b.ratio-a.ratio);
-  $("#statsQuote").innerHTML=qr.map(r=>{ const pct=Math.round((r.ratio-1)*100); const over=pct>10;
-    return `<div class="stat"><span>${esc(r.t)} <span class="muted">(${r.n})</span></span><span class="v" style="color:${over?'var(--warn)':'var(--accent)'}">${pct>0?"+":""}${pct}%</span></div>`;
-  }).join("")+'<small class="hint">+ = the job takes longer than you estimated. These are where you are quietly losing money.</small>';
 }
 
 /* ---------- export ---------- */
@@ -944,7 +993,8 @@ function jobFromRow(r){ return { id:r.id, createdAt:r.created_at, date:r.job_dat
   ageYears:r.age_years, actualMins:Number(r.actual_mins)||0, quotedHours:Number(r.quoted_hours)||0,
   labourCharged:Number(r.labour_charged)||0, partsCharged:Number(r.parts_charged)||0, partsCost:Number(r.parts_cost)||0,
   motResult:r.mot_result||null, motWork:r.mot_work||"", motCostUs:Number(r.mot_cost_us)||0, motCostCustomer:Number(r.mot_cost_customer)||0,
-  customer:r.customer||"", notes:r.notes||"", comeback:!!r.comeback, synced:true }; }
+  customer:r.customer||"", notes:r.notes||"", comeback:!!r.comeback,
+  closed:(r.closed!=null?!!r.closed:((Number(r.labour_charged)||0)+(Number(r.parts_charged)||0)+(Number(r.mot_cost_customer)||0)>0 || Number(r.actual_mins)>0)), synced:true }; }
 function custFromRow(r){ return { id:r.id, name:r.name||"", phone:r.phone||"", cars:Array.isArray(r.cars)?r.cars:(r.cars||[]), createdAt:r.created_at }; }
 function purchFromRow(r){ return { id:r.id, createdAt:r.created_at, date:r.purchase_date, supplier:r.supplier||"", net:Number(r.net)||0, vat:Number(r.vat)||0, gross:Number(r.gross)||0, notes:r.notes||"" }; }
 function mergeJobs(remote){ const byId={}; jobs.forEach(j=>byId[j.id]=j);
@@ -988,7 +1038,7 @@ function rowFor(j){ return { id:j.id, created_at:j.createdAt, job_date:j.date, j
   model:j.model, reg:j.reg, customer_id:j.customerId, age_years:j.ageYears, actual_mins:j.actualMins, quoted_hours:j.quotedHours,
   labour_charged:j.labourCharged, parts_charged:j.partsCharged, parts_cost:j.partsCost,
   mot_result:j.motResult||null, mot_work:j.motWork||"", mot_cost_us:j.motCostUs||0, mot_cost_customer:j.motCostCustomer||0,
-  total_charged:jobTotal(j), customer:j.customer, notes:j.notes, comeback:j.comeback }; }
+  closed:!!j.closed, total_charged:jobTotal(j), customer:j.customer, notes:j.notes, comeback:j.comeback }; }
 async function pushOne(j){ if(!sb) return; try{ const {error}=await sb.from("jobs").upsert(rowFor(j)); if(!error){ j.synced=true; save(LS_JOBS,jobs); } }catch(e){} }
 function custRow(c){ return { id:c.id, name:c.name, phone:c.phone||"", cars:c.cars||[],
   created_at:c.createdAt||new Date().toISOString(), updated_at:new Date().toISOString() }; }
@@ -1005,14 +1055,19 @@ function showView(v){
 
 /* ---------- wire ---------- */
 customTypes=customTypes.filter(t=>!JOB_TYPES.some(s=>s.toLowerCase()===(t||"").toLowerCase())); save(LS_TYPES,customTypes);
-buildChips(); updateAge();
+jobs.forEach(j=>{ if(j.closed===undefined) j.closed=(jobTotal(j)>0||Number(j.actualMins)>0); }); save(LS_JOBS,jobs);
+buildChips();
 attachCombo($("#make"), $("#makeList"), allMakes, null, "make");
 attachCombo($("#model"), $("#modelList"), allModels, null, "model");
 attachCombo($("#customer"), $("#customerList"), ()=>uniqSort(customers.map(c=>c.name)), onPickCustomer, null);
 $("#customer").addEventListener("input", ()=>{ const c=getCustomer(selCustomerId);
   if(!c || c.name.toLowerCase()!==$("#customer").value.trim().toLowerCase()){ selCustomerId=null; $("#customerCars").innerHTML=""; } });
-$("#reg").addEventListener("input", function(){ const p=this.selectionStart; this.value=this.value.toUpperCase(); this.setSelectionRange&&this.setSelectionRange(p,p); });
-$("#ageRange").addEventListener("input", ()=>{ ageSet=true; updateAge(); });
+$("#reg").addEventListener("input", function(){ const p=this.selectionStart; this.value=this.value.toUpperCase(); this.setSelectionRange&&this.setSelectionRange(p,p); showRegAge(); });
+$("#completeBtn").onclick=function(){ if(this._reopen) reopenJob(); else saveJob(true); };
+$("#jobFilter").addEventListener("click",function(e){ const c=e.target.closest(".chip"); if(!c) return; jobFilter=c.dataset.f;
+  [...this.children].forEach(x=>x.classList.toggle("on",x===c)); viewDate=null; renderJobs(); });
+$("#bdEditBtn").onclick=function(){ closeBreakdown(); if(bdJobId) editJob(bdJobId); };
+$("#bdCloseBtn").onclick=closeBreakdown;
 $("#scanSplitBtn").onclick=createSplitJobs;
 $("#scanOneBtn").onclick=fillMerged;
 $("#typeSearch").addEventListener("input", filterChips);
