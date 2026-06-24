@@ -168,6 +168,7 @@
       <div class="divider">Or enter manually</div>
 
       <label>Job type <span class="opt">(tap all that apply)</span></label>
+      <input id="typeSearch" placeholder="Search job types…" autocomplete="off" style="margin-bottom:10px;" />
       <div class="chips" id="jobTypeChips"></div>
       <div id="smallDescBlock" style="display:none;">
         <label>What was the job?</label>
@@ -407,6 +408,17 @@ function buildChips(){
     if(!selTypes.some(x=>x.toLowerCase()===name.toLowerCase())) selTypes.push(name);
     pushOption("jobtype",name); buildChips(); }); };
   tc.appendChild(other);
+  filterChips();
+}
+const PINNED_TYPES=["small job","service","mot"];
+function filterChips(){
+  const q=($("#typeSearch")?$("#typeSearch").value:"").trim().toLowerCase();
+  [...$("#jobTypeChips").children].forEach(c=>{
+    if(c.classList.contains("add")){ c.style.display="flex"; return; }
+    const t=(c.textContent||"").toLowerCase();
+    const show = !q || t.includes(q) || PINNED_TYPES.includes(t) || c.classList.contains("on");
+    c.style.display = show ? "flex" : "none";
+  });
 }
 function updateAge(){ const r=$("#ageRange"); const v=+r.value;
   $("#ageOut").textContent = ageSet ? (v>=40 ? "40+ yrs" : v+(v===1?" yr":" yrs")) : "Not set";
@@ -788,6 +800,7 @@ $("#customer").addEventListener("input", ()=>{ const c=getCustomer(selCustomerId
   if(!c || c.name.toLowerCase()!==$("#customer").value.trim().toLowerCase()){ selCustomerId=null; $("#customerCars").innerHTML=""; } });
 $("#reg").addEventListener("input", function(){ const p=this.selectionStart; this.value=this.value.toUpperCase(); this.setSelectionRange&&this.setSelectionRange(p,p); });
 $("#ageRange").addEventListener("input", ()=>{ ageSet=true; updateAge(); });
+$("#typeSearch").addEventListener("input", filterChips);
 $("#smallDesc").addEventListener("input",function(){ $("#notes").value=this.value; });
 $("#motResultChips").addEventListener("click",function(e){ const c=e.target.closest(".chip"); if(!c) return; setMotResult(selMot===c.dataset.mot?null:c.dataset.mot); });
 $("#scanBtn").onclick=()=>$("#invFile").click();
