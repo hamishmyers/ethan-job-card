@@ -190,7 +190,12 @@
         </div>
       </div>
 
-      <label>Time spent <span class="opt">(add when you finish)</span></label>
+      <label>Time spent <span class="opt">(stopwatch or type it in)</span></label>
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
+        <button class="btn grey" id="swToggle" style="width:auto; min-height:48px; padding:12px 20px; margin:0;">▶ Start</button>
+        <span id="swDisplay" style="font-weight:800; font-size:1.25rem; font-variant-numeric:tabular-nums;">00:00</span>
+        <button class="chip" id="swReset" style="margin-left:auto; min-height:42px;">Reset</button>
+      </div>
       <div class="row">
         <div class="unit"><input id="hrs" type="number" inputmode="numeric" min="0" placeholder="0" /><b>hrs</b></div>
         <div class="unit"><input id="mins" type="number" inputmode="numeric" min="0" max="59" placeholder="0" /><b>min</b></div>
@@ -389,9 +394,35 @@ const JOB_TYPES = ["Small job","Service","MOT","Brakes","Clutch","Cambelt/Timing
 const MAKES_SEED = ["Audi","BMW","Citroën","Dacia","Fiat","Ford","Honda","Hyundai","Jaguar","Kia",
   "Land Rover","Lexus","Mazda","Mercedes-Benz","MG","MINI","Nissan","Peugeot","Renault","SEAT",
   "Škoda","Suzuki","Tesla","Toyota","Vauxhall","Volkswagen","Volvo"];
-const MODELS_SEED = ["Fiesta","Focus","Corsa","Astra","Golf","Polo","Qashqai","Juke","Micra","Clio",
-  "208","308","3 Series","1 Series","A3","A4","Civic","Jazz","Yaris","Corolla","C-Class","A-Class",
-  "Sportage","Ceed","Ibiza","Leon","Octavia","Fabia","Mokka","Insignia","Tiguan","Passat","Transit","Berlingo"];
+const MODELS_BY_MAKE = {
+  "Audi":["A1","A3","A4","A5","A6","Q2","Q3","Q5","TT"],
+  "BMW":["1 Series","2 Series","3 Series","4 Series","5 Series","X1","X3","X5"],
+  "Citroën":["C1","C3","C4","C3 Aircross","C5 Aircross","Berlingo"],
+  "Dacia":["Sandero","Duster","Logan"],
+  "Fiat":["500","Panda","Punto","Tipo"],
+  "Ford":["Fiesta","Focus","Kuga","Puma","Mondeo","EcoSport","KA","Transit","Transit Custom"],
+  "Honda":["Jazz","Civic","CR-V","HR-V"],
+  "Hyundai":["i10","i20","i30","Tucson","Kona"],
+  "Jaguar":["XE","XF","F-Pace","E-Pace"],
+  "Kia":["Picanto","Rio","Ceed","Sportage","Niro"],
+  "Land Rover":["Defender","Discovery","Discovery Sport","Range Rover","Range Rover Evoque","Freelander"],
+  "Lexus":["IS","CT","NX","RX"],
+  "Mazda":["2","3","6","CX-3","CX-5","MX-5"],
+  "Mercedes-Benz":["A-Class","B-Class","C-Class","E-Class","CLA","GLA","GLC"],
+  "MG":["MG3","ZS","HS","MG5"],
+  "MINI":["Hatch","Countryman","Clubman"],
+  "Nissan":["Micra","Note","Juke","Qashqai","X-Trail","Leaf"],
+  "Peugeot":["108","208","308","2008","3008","5008","Partner"],
+  "Renault":["Clio","Captur","Megane","Kadjar","Scenic"],
+  "SEAT":["Ibiza","Leon","Arona","Ateca"],
+  "Škoda":["Fabia","Octavia","Superb","Scala","Karoq","Kodiaq"],
+  "Suzuki":["Swift","Vitara","Ignis","SX4 S-Cross"],
+  "Tesla":["Model 3","Model Y","Model S","Model X"],
+  "Toyota":["Aygo","Yaris","Corolla","Auris","C-HR","RAV4"],
+  "Vauxhall":["Corsa","Astra","Insignia","Mokka","Crossland","Grandland","Zafira","Viva"],
+  "Volkswagen":["Up","Polo","Golf","Passat","Tiguan","T-Roc","Touran"],
+  "Volvo":["V40","V60","S60","XC40","XC60","XC90"]
+};
 const LS_JOBS="joblog.jobs.v3", LS_SUPA="joblog.supa.v1", LS_CUST="joblog.customers.v1",
   LS_MAKES="joblog.makes.v1", LS_MODELS="joblog.models.v1", LS_TYPES="joblog.types.v1";
 const SUPA_DEFAULT = { url:"https://gvyvjfldvbwdiexjyxzh.supabase.co", key:"sb_publishable_qRVzjnqhCrUN6xxrKlWDtw_aSprTZ0T" };
@@ -401,7 +432,8 @@ let jobs = load(LS_JOBS, []);
 let customers = load(LS_CUST, []);
 let purchases = load("joblog.purchases.v1", []);
 let editingPurchaseId = null;
-let customMakes = load(LS_MAKES, []), customModels = load(LS_MODELS, []), customTypes = load(LS_TYPES, []);
+let customMakes = load(LS_MAKES, []), customTypes = load(LS_TYPES, []);
+let customModelsByMake = load(LS_MODELS, {}); if(Array.isArray(customModelsByMake)) customModelsByMake={};
 let selTypes=[], comeback=false, editingId=null, viewDate=null, selCustomerId=null, pending=null, selMot=null, jobFilter="all";
 let usage=load("joblog.usage.v1",{}), bdJobId=null;
 let supa = load(LS_SUPA, SUPA_DEFAULT);
@@ -422,7 +454,13 @@ function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,
 function uniqSort(a){ return [...new Set(a)].sort((x,y)=>x.localeCompare(y)); }
 function normReg(r){ return (r||"").toUpperCase().replace(/\s+/g,""); }
 function allMakes(){ return uniqSort([...MAKES_SEED,...customMakes]); }
-function allModels(){ return uniqSort([...MODELS_SEED,...customModels]); }
+function modelsForMake(make){
+  const mk=(make||"").trim().toLowerCase();
+  const key=Object.keys(MODELS_BY_MAKE).find(k=>k.toLowerCase()===mk);
+  const base=key?MODELS_BY_MAKE[key].slice():[];
+  const cust=customModelsByMake[mk]||[];
+  return uniqSort([...base,...cust]);
+}
 function allJobTypes(){
   const out=[...JOB_TYPES]; const lower=out.map(x=>x.toLowerCase());
   customTypes.forEach(t=>{ const l=(t||"").toLowerCase(); if(t && !lower.includes(l)){ out.push(t); lower.push(l); } });
@@ -493,6 +531,21 @@ function showRegAge(){
   const reg=$("#reg").value; const a=ukPlateAge(reg);
   $("#regAge").textContent = a!=null ? "≈ "+a+" yr"+(a===1?"":"s")+" old (from plate)" : (reg.trim()? "Private / non-standard plate — age not set" : "");
 }
+let sw={running:false,accum:0,start:0,tick:null};
+function swFmt(ms){ const s=Math.floor(ms/1000),h=Math.floor(s/3600),m=Math.floor((s%3600)/60),ss=s%60;
+  return (h>0?String(h).padStart(2,"0")+":":"")+String(m).padStart(2,"0")+":"+String(ss).padStart(2,"0"); }
+function swMs(){ return sw.accum+(sw.running?Date.now()-sw.start:0); }
+function swRender(){ $("#swDisplay").textContent=swFmt(swMs()); }
+function swApply(){ const mins=Math.round(swMs()/60000); $("#hrs").value=Math.floor(mins/60)||""; $("#mins").value=mins%60||""; }
+function swToggle(){
+  if(sw.running){ sw.accum+=Date.now()-sw.start; sw.running=false; clearInterval(sw.tick);
+    $("#swToggle").textContent="▶ Resume"; $("#swToggle").className="btn green"; swApply(); }
+  else { sw.running=true; sw.start=Date.now(); sw.tick=setInterval(swRender,1000);
+    $("#swToggle").textContent="⏸ Pause"; $("#swToggle").className="btn red"; }
+  swRender();
+}
+function swReset(){ if(sw.tick) clearInterval(sw.tick); sw={running:false,accum:0,start:0,tick:null};
+  $("#swToggle").textContent="▶ Start"; $("#swToggle").className="btn grey"; swRender(); }
 function isSmallSelected(){ return selTypes.some(t=>t.toLowerCase()==="small job"); }
 function toggleSmallDesc(){
   const on=isSmallSelected();
@@ -529,9 +582,11 @@ function attachCombo(input, list, optionsFn, onPick, otherLabel){
 function persistCustom(){
   const mk=$("#make").value.trim(), md=$("#model").value.trim();
   if(mk && !allMakes().some(x=>x.toLowerCase()===mk.toLowerCase())){ customMakes.push(mk); save(LS_MAKES,customMakes); }
-  if(md && !allModels().some(x=>x.toLowerCase()===md.toLowerCase())){ customModels.push(md); save(LS_MODELS,customModels); }
   if(mk && !MAKES_SEED.some(x=>x.toLowerCase()===mk.toLowerCase())) pushOption("make",mk);
-  if(md && !MODELS_SEED.some(x=>x.toLowerCase()===md.toLowerCase())) pushOption("model",md);
+  if(md && mk){ const mkL=mk.toLowerCase();
+    if(!modelsForMake(mk).some(x=>x.toLowerCase()===md.toLowerCase())){ (customModelsByMake[mkL]=customModelsByMake[mkL]||[]).push(md); save(LS_MODELS,customModelsByMake); }
+    pushOption("model", mk+"::"+md);
+  }
 }
 function renderCustomerCars(){
   const box=$("#customerCars"); box.innerHTML="";
@@ -738,6 +793,7 @@ function createSplitJobs(){
 function editJob(id){
   const j=jobs.find(x=>x.id===id); if(!j) return;
   editingId=id; selTypes=jobTypesOf(j).slice(); comeback=!!j.comeback; selCustomerId=j.customerId||null;
+  swReset();
   buildChips(); $("#comebackChip").classList.toggle("on", comeback);
   $("#jobDate").value=j.date;
   $("#hrs").value=Math.floor(j.actualMins/60)||""; $("#mins").value=j.actualMins%60||"";
@@ -784,6 +840,7 @@ function clearForm(){
   buildChips(); toggleSmallDesc(); toggleMot();
   $("#saveBtn").textContent="Save job"; $("#cancelBtn").style.display="none"; $("#deleteBtn").style.display="none";
   const cb=$("#completeBtn"); cb.textContent="Mark complete ✓"; cb.className="btn blue"; cb._reopen=false;
+  swReset();
   window.scrollTo({top:0,behavior:"smooth"});
 }
 
@@ -1016,7 +1073,7 @@ function flushUnsynced(){
   customers.forEach(c=>pushCustomer(c));
   jobs.filter(j=>!j.synced).forEach(j=>pushOne(j));
   customMakes.forEach(v=>pushOption("make",v));
-  customModels.forEach(v=>pushOption("model",v));
+  Object.keys(customModelsByMake).forEach(mk=>(customModelsByMake[mk]||[]).forEach(md=>pushOption("model",mk+"::"+md)));
   customTypes.forEach(v=>pushOption("jobtype",v));
   purchases.forEach(p=>pushPurchase(p));
   loadOptions();
@@ -1028,10 +1085,11 @@ async function loadOptions(){
     let changed=false;
     data.forEach(o=>{ const v=(o.value||"").trim(); if(!v) return;
       if(o.kind==="make" && !allMakes().some(x=>x.toLowerCase()===v.toLowerCase())){ customMakes.push(v); changed=true; }
-      else if(o.kind==="model" && !allModels().some(x=>x.toLowerCase()===v.toLowerCase())){ customModels.push(v); changed=true; }
+      else if(o.kind==="model"){ const parts=v.split("::"); if(parts.length===2){ const mk=parts[0].trim().toLowerCase(), md=parts[1].trim();
+        if(md && !modelsForMake(parts[0]).some(x=>x.toLowerCase()===md.toLowerCase())){ (customModelsByMake[mk]=customModelsByMake[mk]||[]).push(md); changed=true; } } }
       else if(o.kind==="jobtype" && !allJobTypes().some(x=>x.toLowerCase()===v.toLowerCase())){ customTypes.push(v); changed=true; }
     });
-    if(changed){ save(LS_MAKES,customMakes); save(LS_MODELS,customModels); save(LS_TYPES,customTypes); buildChips(); }
+    if(changed){ save(LS_MAKES,customMakes); save(LS_MODELS,customModelsByMake); save(LS_TYPES,customTypes); buildChips(); }
   }catch(e){}
 }
 function rowFor(j){ return { id:j.id, created_at:j.createdAt, job_date:j.date, job_type:typeLabel(j), make:j.make,
@@ -1057,8 +1115,8 @@ function showView(v){
 customTypes=customTypes.filter(t=>!JOB_TYPES.some(s=>s.toLowerCase()===(t||"").toLowerCase())); save(LS_TYPES,customTypes);
 jobs.forEach(j=>{ if(j.closed===undefined) j.closed=(jobTotal(j)>0||Number(j.actualMins)>0); }); save(LS_JOBS,jobs);
 buildChips();
-attachCombo($("#make"), $("#makeList"), allMakes, null, "make");
-attachCombo($("#model"), $("#modelList"), allModels, null, "model");
+attachCombo($("#make"), $("#makeList"), allMakes, ()=>{ $("#modelList").classList.remove("open"); }, "make");
+attachCombo($("#model"), $("#modelList"), ()=>modelsForMake($("#make").value), null, "model");
 attachCombo($("#customer"), $("#customerList"), ()=>uniqSort(customers.map(c=>c.name)), onPickCustomer, null);
 $("#customer").addEventListener("input", ()=>{ const c=getCustomer(selCustomerId);
   if(!c || c.name.toLowerCase()!==$("#customer").value.trim().toLowerCase()){ selCustomerId=null; $("#customerCars").innerHTML=""; } });
@@ -1068,6 +1126,8 @@ $("#jobFilter").addEventListener("click",function(e){ const c=e.target.closest("
   [...this.children].forEach(x=>x.classList.toggle("on",x===c)); viewDate=null; renderJobs(); });
 $("#bdEditBtn").onclick=function(){ closeBreakdown(); if(bdJobId) editJob(bdJobId); };
 $("#bdCloseBtn").onclick=closeBreakdown;
+$("#swToggle").onclick=swToggle;
+$("#swReset").onclick=swReset;
 $("#scanSplitBtn").onclick=createSplitJobs;
 $("#scanOneBtn").onclick=fillMerged;
 $("#typeSearch").addEventListener("input", filterChips);
