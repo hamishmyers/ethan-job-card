@@ -152,6 +152,7 @@
 <body>
 
 <button class="cog" id="cogBtn" aria-label="Settings">⚙️</button>
+<datalist id="typeOptions"></datalist>
 
 <div class="wrap">
 
@@ -167,54 +168,7 @@
       <button class="btn grey" id="partsScanBtn" style="margin-top:8px;">📦 Scan a parts invoice (for VAT)</button>
       <input type="file" accept="image/*" capture="environment" id="partsFile" style="display:none" />
 
-      <div class="divider">Or enter manually</div>
-
-      <label>Job type <span class="opt">(tap all that apply)</span></label>
-      <input id="typeSearch" placeholder="Search any job type…" autocomplete="off" style="margin-bottom:8px;" />
-      <div class="hint-inline" style="margin:0 0 8px;">Common ones first — tap any, or search to narrow</div>
-      <div class="chips" id="jobTypeChips"></div>
-      <div id="smallDescBlock" style="display:none;">
-        <label>What was the job?</label>
-        <textarea id="smallDesc" rows="2" placeholder="Describe the small / odd job"></textarea>
-      </div>
-      <div id="motBlock" style="display:none;">
-        <label>MOT result</label>
-        <div class="chips" id="motResultChips">
-          <span class="chip" data-mot="pass">✓ Pass</span>
-          <span class="chip" data-mot="fail">✗ Fail</span>
-        </div>
-        <label>Work needed / advisories <span class="opt">(optional)</span></label>
-        <textarea id="motWork" rows="2" placeholder="What it needs, from the MOT sheet"></textarea>
-        <div class="row">
-          <div><label>MOT cost to us</label><div class="affix"><span>£</span><input id="motCostUs" type="number" inputmode="decimal" placeholder="0" /></div></div>
-          <div><label>MOT to customer</label><div class="affix"><span>£</span><input id="motCostCustomer" type="number" inputmode="decimal" placeholder="0" /></div></div>
-        </div>
-      </div>
-
-      <label>Time spent <span class="opt">(stopwatch or type it in)</span></label>
-      <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
-        <button class="btn grey" id="swToggle" style="width:auto; min-height:48px; padding:12px 20px; margin:0;">▶ Start</button>
-        <span id="swDisplay" style="font-weight:800; font-size:1.25rem; font-variant-numeric:tabular-nums;">00:00</span>
-        <button class="chip" id="swReset" style="margin-left:auto; min-height:42px;">Reset</button>
-      </div>
-      <div class="row">
-        <div class="unit"><input id="hrs" type="number" inputmode="numeric" min="0" placeholder="0" /><b>hrs</b></div>
-        <div class="unit"><input id="mins" type="number" inputmode="numeric" min="0" max="59" placeholder="0" /><b>min</b></div>
-      </div>
-
-      <label>Labour charged</label>
-      <div class="affix"><span>£</span><input id="labourCharged" type="number" inputmode="decimal" placeholder="0" /></div>
-
-      <label>Parts charged <span class="opt">(what the customer pays for parts)</span></label>
-      <div class="affix"><span>£</span><input id="partsCharged" type="number" inputmode="decimal" placeholder="0" /></div>
-
-      <label>Parts cost <span class="opt">(what you paid)</span></label>
-      <div class="affix"><span>£</span><input id="partsCost" type="number" inputmode="decimal" placeholder="0" /></div>
-
-      <div class="divider">Optional</div>
-
-      <label>Date <span class="opt">(defaults to today, change to back-date)</span></label>
-      <input id="jobDate" type="date" />
+      <div class="divider">Customer &amp; vehicle</div>
 
       <label>Customer name</label>
       <div class="combo">
@@ -242,14 +196,15 @@
         <div class="combo-list" id="modelList"></div>
       </div>
 
-      <div id="notesBlock">
-        <label>Notes</label>
-        <textarea id="notes" rows="2" placeholder="Any more useful context?"></textarea>
-      </div>
+      <label>Date <span class="opt">(defaults to today)</span></label>
+      <input id="jobDate" type="date" />
 
-      <button class="btn green" id="saveBtn" style="margin-top:20px;">Save job</button>
-      <button class="btn grey" id="addAnotherBtn">Save &amp; add another job</button>
-      <button class="btn blue" id="completeBtn">Mark complete ✓</button>
+      <div class="divider">Jobs on this visit</div>
+      <div id="jobBlocks"></div>
+      <button class="btn grey" id="addAnotherBtn">+ Add another job</button>
+
+      <button class="btn green" id="saveBtn" style="margin-top:16px;">Save</button>
+      <button class="btn blue" id="completeBtn">Mark all complete ✓</button>
       <button class="btn grey" id="cancelBtn" style="display:none;">Cancel edit</button>
       <button class="btn red" id="deleteBtn" style="display:none;">Delete this job</button>
     </div>
@@ -388,7 +343,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 /* ---------- config ---------- */
-const JOB_TYPES = ["Small job","Service","MOT","Brakes","Clutch","Cambelt/Timing","Diagnostics","Suspension",
+const JOB_TYPES = ["Random job","Service","MOT","Brakes","Clutch","Cambelt/Timing","Diagnostics","Suspension",
   "Exhaust","Tyres","Battery/Electrical","Aircon","Engine","Welding"];
 const MAKES_SEED = ["Audi","BMW","Citroën","Dacia","Fiat","Ford","Honda","Hyundai","Jaguar","Kia",
   "Land Rover","Lexus","Mazda","Mercedes-Benz","MG","MINI","Nissan","Peugeot","Renault","SEAT",
@@ -497,40 +452,102 @@ function addCar(custId, car){ const c=getCustomer(custId); if(!c) return; if(!c.
   if(car.reg && !c.cars.some(x=>normReg(x.reg)===normReg(car.reg))){ c.cars.push(car); save(LS_CUST,customers); }
   else if(!car.reg && (car.make||car.model) && !c.cars.length){ c.cars.push(car); save(LS_CUST,customers); } }
 
-/* ---------- chips (multi-select job type) ---------- */
-const PINNED_TYPES=["mot","brakes","service","tyres"];
+/* ---------- job type options ---------- */
+const QUICK_TYPES=["MOT","Brakes","Service","Tyres"];
 function orderedTypes(){
-  const canon=["MOT","Brakes","Service","Tyres"];
   const all=allJobTypes();
-  const pinned=canon.filter(p=>all.some(t=>t.toLowerCase()===p.toLowerCase()));
-  const rest=all.filter(t=>!canon.some(p=>p.toLowerCase()===t.toLowerCase()))
+  const pinned=QUICK_TYPES.filter(p=>all.some(t=>t.toLowerCase()===p.toLowerCase()));
+  const rest=all.filter(t=>!QUICK_TYPES.some(p=>p.toLowerCase()===t.toLowerCase()))
     .sort((a,b)=>((usage[b.toLowerCase()]||0)-(usage[a.toLowerCase()]||0)) || a.localeCompare(b));
   return pinned.concat(rest);
 }
-function buildChips(){
-  const tc=$("#jobTypeChips"); tc.innerHTML="";
-  orderedTypes().forEach(t=>{
-    const c=document.createElement("span"); c.className="chip"+(selTypes.includes(t)?" on":""); c.textContent=t;
-    c.onclick=()=>{ const i=selTypes.indexOf(t); if(i>=0) selTypes.splice(i,1); else selTypes.push(t); c.classList.toggle("on"); toggleSmallDesc(); toggleMot(); };
-    tc.appendChild(c);
-  });
-  const other=document.createElement("span"); other.className="chip add"; other.textContent="+ Other";
-  other.onclick=()=>{ showPrompt("Add a job type","e.g. Air-con regas",(name)=>{
-    if(!allJobTypes().some(x=>x.toLowerCase()===name.toLowerCase())){ customTypes.push(name); save(LS_TYPES,customTypes); }
-    if(!selTypes.some(x=>x.toLowerCase()===name.toLowerCase())) selTypes.push(name);
-    pushOption("jobtype",name); buildChips(); }); };
-  tc.appendChild(other);
-  filterChips();
+function populateTypeOptions(){ const dl=$("#typeOptions"); if(!dl) return; dl.innerHTML=""; orderedTypes().forEach(t=>{ const o=document.createElement("option"); o.value=t; dl.appendChild(o); }); }
+
+/* ---------- job blocks ---------- */
+let blocks=[], blockSeq=0;
+function blockHTML(bid){ return `
+  <div class="card" id="blk-${bid}" style="background:var(--card2);">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div style="font-weight:800;">Job <span class="blkNum"></span></div>
+      <button class="chip blkRemove" data-id="${bid}" style="min-height:38px;">Remove</button>
+    </div>
+    <label>Job type</label>
+    <div class="chips">${QUICK_TYPES.map(t=>`<span class="chip blkQuick" data-id="${bid}">${t}</span>`).join("")}</div>
+    <input class="blkType" data-id="${bid}" list="typeOptions" placeholder="Type or tap above" autocomplete="off" style="margin-top:8px;" />
+    <label>Time spent</label>
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
+      <button class="btn grey blkSw" data-id="${bid}" style="width:auto; min-height:46px; padding:10px 18px; margin:0;">▶ Start</button>
+      <span class="blkSwDisp" data-id="${bid}" style="font-weight:800; font-size:1.2rem; font-variant-numeric:tabular-nums;">00:00</span>
+    </div>
+    <div class="row">
+      <div class="unit"><input class="blkHrs" data-id="${bid}" type="number" inputmode="numeric" min="0" placeholder="0" /><b>hrs</b></div>
+      <div class="unit"><input class="blkMins" data-id="${bid}" type="number" inputmode="numeric" min="0" max="59" placeholder="0" /><b>min</b></div>
+    </div>
+    <label>Labour charged</label>
+    <div class="affix"><span>£</span><input class="blkLabour" data-id="${bid}" type="number" inputmode="decimal" placeholder="0" /></div>
+    <label>Parts charged <span class="opt">(to customer)</span></label>
+    <div class="affix"><span>£</span><input class="blkPC" data-id="${bid}" type="number" inputmode="decimal" placeholder="0" /></div>
+    <label>Parts cost <span class="opt">(what you paid)</span></label>
+    <div class="affix"><span>£</span><input class="blkPK" data-id="${bid}" type="number" inputmode="decimal" placeholder="0" /></div>
+    <div class="blkMot" data-id="${bid}" style="display:none;">
+      <label>MOT result</label>
+      <div class="chips blkMotRes" data-id="${bid}"><span class="chip" data-mot="pass">✓ Pass</span><span class="chip" data-mot="fail">✗ Fail</span></div>
+      <label>MOT work / advisories <span class="opt">(optional)</span></label>
+      <textarea class="blkMotWork" data-id="${bid}" rows="2" placeholder="From the MOT sheet"></textarea>
+      <div class="row">
+        <div><label>MOT cost to us</label><div class="affix"><span>£</span><input class="blkMotUs" data-id="${bid}" type="number" inputmode="decimal" placeholder="0" /></div></div>
+        <div><label>MOT to customer</label><div class="affix"><span>£</span><input class="blkMotCust" data-id="${bid}" type="number" inputmode="decimal" placeholder="0" /></div></div>
+      </div>
+    </div>
+    <label>Notes <span class="opt">(optional)</span></label>
+    <textarea class="blkNotes" data-id="${bid}" rows="2" placeholder="Any more useful context?"></textarea>
+  </div>`;
 }
-function filterChips(){
-  const q=($("#typeSearch")?$("#typeSearch").value:"").trim().toLowerCase();
-  [...$("#jobTypeChips").children].forEach(c=>{
-    if(c.classList.contains("add")){ c.style.display="flex"; return; }
-    const t=(c.textContent||"").toLowerCase();
-    const show = q ? (t.includes(q)||PINNED_TYPES.includes(t)||c.classList.contains("on")) : true;
-    c.style.display = show ? "flex" : "none";
-  });
+function blkState(bid){ return blocks.find(b=>b.id===bid); }
+function addBlock(prefill){
+  const bid=++blockSeq;
+  blocks.push({id:bid, motResult:(prefill&&prefill.motResult)||null, accum:0, running:false, start:0, tick:null});
+  $("#jobBlocks").insertAdjacentHTML("beforeend", blockHTML(bid));
+  const el=$("#blk-"+bid);
+  if(prefill){
+    if(prefill.type) el.querySelector(".blkType").value=prefill.type;
+    if(prefill.mins){ el.querySelector(".blkHrs").value=Math.floor(prefill.mins/60)||""; el.querySelector(".blkMins").value=prefill.mins%60||""; }
+    if(prefill.labour!=null&&prefill.labour!=="") el.querySelector(".blkLabour").value=prefill.labour;
+    if(prefill.partsCharged!=null&&prefill.partsCharged!=="") el.querySelector(".blkPC").value=prefill.partsCharged;
+    if(prefill.partsCost!=null&&prefill.partsCost!=="") el.querySelector(".blkPK").value=prefill.partsCost;
+    if(prefill.notes) el.querySelector(".blkNotes").value=prefill.notes;
+    if(prefill.motWork) el.querySelector(".blkMotWork").value=prefill.motWork;
+    if(prefill.motCostUs) el.querySelector(".blkMotUs").value=prefill.motCostUs;
+    if(prefill.motCostCustomer) el.querySelector(".blkMotCust").value=prefill.motCostCustomer;
+  }
+  updateBlkMot(bid); renderBlkMotRes(bid); renumberBlocks();
+  return bid;
 }
+function removeBlock(bid){ const b=blkState(bid); if(b&&b.tick) clearInterval(b.tick); blocks=blocks.filter(x=>x.id!==bid); const el=$("#blk-"+bid); if(el) el.remove(); if(!blocks.length) addBlock(); renumberBlocks(); }
+function renumberBlocks(){ [...$("#jobBlocks").children].forEach((el,i)=>{ const n=el.querySelector(".blkNum"); if(n) n.textContent=i+1; const rm=el.querySelector(".blkRemove"); if(rm) rm.style.display=blocks.length>1?"flex":"none"; }); }
+function updateBlkMot(bid){ const el=$("#blk-"+bid); if(!el) return; const isMot=el.querySelector(".blkType").value.trim().toLowerCase()==="mot"; el.querySelector(".blkMot").style.display=isMot?"block":"none"; }
+function renderBlkMotRes(bid){ const b=blkState(bid); const el=$("#blk-"+bid); if(!el) return; el.querySelectorAll(".blkMotRes .chip").forEach(c=>c.classList.toggle("on", c.dataset.mot===(b&&b.motResult))); }
+function blkSwApply(bid){ const b=blkState(bid), el=$("#blk-"+bid); if(!b||!el) return; const ms=b.accum+(b.running?Date.now()-b.start:0); const mins=Math.round(ms/60000); el.querySelector(".blkHrs").value=Math.floor(mins/60)||""; el.querySelector(".blkMins").value=mins%60||""; }
+function blkSwRender(bid){ const b=blkState(bid), el=$("#blk-"+bid); if(!b||!el) return; const ms=b.accum+(b.running?Date.now()-b.start:0); const s=Math.floor(ms/1000),h=Math.floor(s/3600),m=Math.floor((s%3600)/60),ss=s%60; el.querySelector(".blkSwDisp").textContent=(h>0?String(h).padStart(2,"0")+":":"")+String(m).padStart(2,"0")+":"+String(ss).padStart(2,"0"); }
+function blkSwToggle(bid){ const b=blkState(bid), el=$("#blk-"+bid); if(!b||!el) return; const btn=el.querySelector(".blkSw");
+  if(b.running){ b.accum+=Date.now()-b.start; b.running=false; clearInterval(b.tick); btn.textContent="▶ Resume"; btn.className="btn green blkSw"; blkSwApply(bid); }
+  else { b.running=true; b.start=Date.now(); b.tick=setInterval(()=>blkSwRender(bid),1000); btn.textContent="⏸ Pause"; btn.className="btn red blkSw"; }
+  blkSwRender(bid);
+}
+function applyRunningStopwatches(){ blocks.forEach(b=>{ if(b.running){ b.accum+=Date.now()-b.start; b.running=false; clearInterval(b.tick); blkSwApply(b.id); } }); }
+function gatherBlocks(){
+  return blocks.map(b=>{ const el=$("#blk-"+b.id); if(!el) return null;
+    const type=el.querySelector(".blkType").value.trim();
+    const mins=(Number(el.querySelector(".blkHrs").value)||0)*60+(Number(el.querySelector(".blkMins").value)||0);
+    const isMot=type.toLowerCase()==="mot";
+    return { type, mins, labour:Number(el.querySelector(".blkLabour").value)||0,
+      partsCharged:Number(el.querySelector(".blkPC").value)||0, partsCost:Number(el.querySelector(".blkPK").value)||0,
+      notes:el.querySelector(".blkNotes").value.trim(),
+      motResult:isMot?b.motResult:null, motWork:isMot?el.querySelector(".blkMotWork").value.trim():"",
+      motCostUs:isMot?(Number(el.querySelector(".blkMotUs").value)||0):0, motCostCustomer:isMot?(Number(el.querySelector(".blkMotCust").value)||0):0 };
+  }).filter(Boolean);
+}
+function clearBlocks(){ blocks.forEach(b=>{ if(b.tick) clearInterval(b.tick); }); blocks=[]; $("#jobBlocks").innerHTML=""; }
 function ukPlateAge(reg){
   const r=(reg||"").toUpperCase().replace(/\s+/g,"");
   const m=r.match(/^[A-Z]{2}(\d{2})[A-Z]{3}$/); if(!m) return null;
@@ -545,34 +562,6 @@ function ukPlateAge(reg){
 function showRegAge(){
   const reg=$("#reg").value; const a=ukPlateAge(reg);
   $("#regAge").textContent = a!=null ? "≈ "+a+" yr"+(a===1?"":"s")+" old (from plate)" : (reg.trim()? "Private / non-standard plate — age not set" : "");
-}
-let sw={running:false,accum:0,start:0,tick:null};
-function swFmt(ms){ const s=Math.floor(ms/1000),h=Math.floor(s/3600),m=Math.floor((s%3600)/60),ss=s%60;
-  return (h>0?String(h).padStart(2,"0")+":":"")+String(m).padStart(2,"0")+":"+String(ss).padStart(2,"0"); }
-function swMs(){ return sw.accum+(sw.running?Date.now()-sw.start:0); }
-function swRender(){ $("#swDisplay").textContent=swFmt(swMs()); }
-function swApply(){ const mins=Math.round(swMs()/60000); $("#hrs").value=Math.floor(mins/60)||""; $("#mins").value=mins%60||""; }
-function swToggle(){
-  if(sw.running){ sw.accum+=Date.now()-sw.start; sw.running=false; clearInterval(sw.tick);
-    $("#swToggle").textContent="▶ Resume"; $("#swToggle").className="btn green"; swApply(); }
-  else { sw.running=true; sw.start=Date.now(); sw.tick=setInterval(swRender,1000);
-    $("#swToggle").textContent="⏸ Pause"; $("#swToggle").className="btn red"; }
-  swRender();
-}
-function swReset(){ if(sw.tick) clearInterval(sw.tick); sw={running:false,accum:0,start:0,tick:null};
-  $("#swToggle").textContent="▶ Start"; $("#swToggle").className="btn grey"; swRender(); }
-function isSmallSelected(){ return selTypes.some(t=>t.toLowerCase()==="small job"); }
-function toggleSmallDesc(){
-  const on=isSmallSelected();
-  $("#smallDescBlock").style.display=on?"block":"none";
-  $("#notesBlock").style.display=on?"none":"block";
-  if(on) $("#smallDesc").value=$("#notes").value;
-}
-function isMotSelected(){ return selTypes.some(t=>t.toLowerCase()==="mot"); }
-function toggleMot(){ $("#motBlock").style.display=isMotSelected()?"block":"none"; }
-function setMotResult(v){
-  selMot=v||null;
-  document.querySelectorAll("#motResultChips .chip").forEach(c=>c.classList.toggle("on", c.dataset.mot===selMot));
 }
 
 /* ---------- combobox ---------- */
@@ -620,60 +609,51 @@ function onPickCustomer(name){ const m=customersByName(name);
   if(m.length===1){ selCustomerId=m[0].id; $("#phone").value=m[0].phone||""; renderCustomerCars(); } else { selCustomerId=null; $("#customerCars").innerHTML=""; } }
 
 /* ---------- save / edit / delete ---------- */
-function saveJob(markComplete, addAnother){
-  if(!selTypes.length){ toast("Pick at least one job type"); return; }
-  pendingAddAnother=!!addAnother;
-  const mins = num("hrs")*60 + num("mins");
+let pendingLog=null;
+function saveLog(markComplete){
+  applyRunningStopwatches();
+  const list=gatherBlocks().filter(b=>b.type);
+  if(!list.length){ toast("Add at least one job (pick a type)"); return; }
   persistCustom();
-  let closed;
-  if(markComplete===true) closed=true;
-  else if(editingId){ const ej=jobs.find(x=>x.id===editingId); closed=!!(ej&&ej.closed); }
-  else closed=false;
-  pending={ date:$("#jobDate").value||today(),
-    jobTypes:selTypes.slice(), jobType:selTypes.join(" + "), actualMins:mins,
-    labourCharged:num("labourCharged"), partsCharged:num("partsCharged"), partsCost:num("partsCost"),
-    make:$("#make").value.trim(), model:$("#model").value.trim(), ageYears:ukPlateAge($("#reg").value),
-    customer:$("#customer").value.trim(), reg:$("#reg").value.trim().toUpperCase(),
-    notes:$("#notes").value.trim(), comeback:comeback, closed:closed,
-    motResult:(isMotSelected()?selMot:null), motWork:(isMotSelected()?$("#motWork").value.trim():""),
-    motCostUs:(isMotSelected()?num("motCostUs"):0), motCostCustomer:(isMotSelected()?num("motCostCustomer"):0) };
-  selTypes.forEach(t=>{ const k=t.toLowerCase(); usage[k]=(usage[k]||0)+1; }); save("joblog.usage.v1",usage);
-  resolveCustomerThenSave();
+  list.forEach(b=>{ if(!allJobTypes().some(x=>x.toLowerCase()===b.type.toLowerCase())){ customTypes.push(b.type); save(LS_TYPES,customTypes); pushOption("jobtype",b.type); }
+    const k=b.type.toLowerCase(); usage[k]=(usage[k]||0)+1; });
+  save("joblog.usage.v1",usage); populateTypeOptions();
+  pendingLog={ shared:{ date:$("#jobDate").value||today(), customer:$("#customer").value.trim(), phone:$("#phone").value.trim(),
+      reg:$("#reg").value.trim().toUpperCase(), make:$("#make").value.trim(), model:$("#model").value.trim() },
+    list, markComplete:!!markComplete };
+  resolveCustomerThenSaveLog();
 }
-function resolveCustomerThenSave(){
-  const name=pending.customer;
-  if(!name){ commitSave(null); return; }
-  if(selCustomerId && getCustomer(selCustomerId)){ commitSave(selCustomerId); return; }
+function resolveCustomerThenSaveLog(){
+  const name=pendingLog.shared.customer;
+  if(!name){ commitLog(null); return; }
+  if(selCustomerId && getCustomer(selCustomerId)){ commitLog(selCustomerId); return; }
   const matches=customersByName(name);
-  if(!matches.length){ commitSave(null, true); return; }
+  if(!matches.length){ commitLog(null,true); return; }
   openDupModal(name, matches);
 }
-function commitSave(customerId, createNew){
-  const car={ reg:pending.reg, make:pending.make, model:pending.model };
-  const phone=$("#phone").value.trim();
-  if(createNew || (!customerId && pending.customer)){
-    const c={ id:uid(), name:pending.customer, phone:phone, createdAt:new Date().toISOString(), cars:(car.reg||car.make||car.model)?[car]:[] };
+function commitLog(customerId, createNew){
+  const s=pendingLog.shared; const car={reg:s.reg,make:s.make,model:s.model};
+  if(createNew || (!customerId && s.customer)){
+    const c={id:uid(), name:s.customer, phone:s.phone, createdAt:new Date().toISOString(), cars:(car.reg||car.make||car.model)?[car]:[]};
     customers.push(c); customerId=c.id; save(LS_CUST,customers);
-  } else if(customerId){ const c=getCustomer(customerId); if(c){ if(phone) c.phone=phone; addCar(customerId, car); save(LS_CUST,customers); } }
+  } else if(customerId){ const c=getCustomer(customerId); if(c){ if(s.phone) c.phone=s.phone; addCar(customerId,car); save(LS_CUST,customers); } }
   if(sb && customerId) pushCustomer(getCustomer(customerId));
-  pending.customerId=customerId||"";
-  const wasEditing=editingId;
-  const open=jobOpen(pending);
-  if(editingId){ const j=jobs.find(x=>x.id===editingId); if(j){ Object.assign(j,pending); j.synced=false; if(sb)pushOne(j); } toast(open?"Saved — still open":"Updated ✓"); }
-  else{ const j={ id:uid(), createdAt:new Date().toISOString(), ...pending, synced:false }; jobs.unshift(j); if(sb)pushOne(j);
-    toast(pendingAddAnother?"Saved — add the next job":(open?"Saved — open":"Saved & completed ✓")); }
-  save(LS_JOBS,jobs); closeDupModal(); renderJobs(); renderStats();
-  if(pendingAddAnother && !wasEditing){ partialClear(customerId); pendingAddAnother=false; return; }
-  pendingAddAnother=false; clearForm();
-  if(wasEditing) showView("jobs");
-}
-function partialClear(custId){
-  selTypes=[]; selMot=null; editingId=null; pending=null;
-  ["hrs","mins","labourCharged","partsCharged","partsCost","notes","smallDesc","motWork","motCostUs","motCostCustomer"].forEach(id=>$("#"+id).value="");
-  setMotResult(null); swReset(); buildChips(); toggleSmallDesc(); toggleMot();
-  selCustomerId=custId||selCustomerId; renderCustomerCars();
-  $("#saveBtn").textContent="Save job"; const cb=$("#completeBtn"); cb.textContent="Mark complete ✓"; cb.className="btn blue"; cb._reopen=false;
-  window.scrollTo({top:0,behavior:"smooth"});
+  const closed=!!pendingLog.markComplete, age=ukPlateAge(s.reg);
+  if(editingId){
+    const j=jobs.find(x=>x.id===editingId), b=pendingLog.list[0];
+    if(j){ Object.assign(j,{ date:s.date, customer:s.customer, reg:s.reg, make:s.make, model:s.model, customerId:customerId||"", ageYears:age,
+      jobTypes:[b.type], jobType:b.type, actualMins:b.mins, labourCharged:b.labour, partsCharged:b.partsCharged, partsCost:b.partsCost,
+      notes:b.notes, motResult:b.motResult, motWork:b.motWork, motCostUs:b.motCostUs, motCostCustomer:b.motCostCustomer, closed }); j.synced=false; if(sb)pushOne(j); }
+    toast("Updated ✓");
+  } else {
+    pendingLog.list.forEach(b=>{ const j={ id:uid(), createdAt:new Date().toISOString(), date:s.date,
+      jobTypes:[b.type], jobType:b.type, actualMins:b.mins, labourCharged:b.labour, partsCharged:b.partsCharged, partsCost:b.partsCost,
+      make:s.make, model:s.model, ageYears:age, customer:s.customer, reg:s.reg, customerId:customerId||"",
+      notes:b.notes, comeback:false, motResult:b.motResult, motWork:b.motWork, motCostUs:b.motCostUs, motCostCustomer:b.motCostCustomer, closed, synced:false };
+      jobs.unshift(j); if(sb)pushOne(j); });
+    toast(closed?"Saved & completed ✓":"Saved — "+pendingLog.list.length+" job"+(pendingLog.list.length>1?"s":""));
+  }
+  save(LS_JOBS,jobs); closeDupModal(); clearForm(); renderJobs(); renderStats(); showView("jobs");
 }
 function openDupModal(name, matches){
   $("#dupTitle").textContent='“'+name+'” already exists';
@@ -684,10 +664,10 @@ function openDupModal(name, matches){
     const d=document.createElement("div"); d.className="cust-opt";
     d.innerHTML=`<div style="font-weight:700;">${esc(c.name)} <span class="muted" style="font-size:.78rem; font-weight:600;">#${esc(String(c.id).slice(-4))}</span></div><div class="cars">${esc(carsTxt)}</div>`;
     const b=document.createElement("button"); b.className="btn blue"; b.textContent="Same customer (add this car if new)";
-    b.onclick=()=>commitSave(c.id); d.appendChild(b); box.appendChild(d);
+    b.onclick=()=>commitLog(c.id); d.appendChild(b); box.appendChild(d);
   });
   const np=document.createElement("button"); np.className="btn grey"; np.textContent="Different person, same name";
-  np.onclick=()=>commitSave(null,true); box.appendChild(np);
+  np.onclick=()=>commitLog(null,true); box.appendChild(np);
   $("#dupModal").classList.add("open");
 }
 function closeDupModal(){ $("#dupModal").classList.remove("open"); }
@@ -736,108 +716,50 @@ function scanInvoice(file){
   });
 }
 function closeScan(){ $("#scanModal").classList.remove("open"); }
-let scanD=null, scanList=null;
 function mapType(s){ if(!s) return null; const l=String(s).toLowerCase().trim();
   let m=allJobTypes().find(t=>t.toLowerCase()===l); if(m) return m;
   m=allJobTypes().find(t=>l.includes(t.toLowerCase())); if(m) return m;
   if(l.includes("mot")) return "MOT"; return null; }
 function fillShared(d){
   if(d.customer_name){ $("#customer").value=d.customer_name; onPickCustomer(d.customer_name); }
-  if(d.registration) $("#reg").value=String(d.registration).toUpperCase();
+  if(d.registration){ $("#reg").value=String(d.registration).toUpperCase(); showRegAge(); }
   if(d.make) $("#make").value=d.make;
   if(d.model) $("#model").value=d.model;
   if(d.date && /^\d{4}-\d{2}-\d{2}$/.test(d.date)) $("#jobDate").value=d.date;
 }
-function applyMot(d){
-  if(d.document_type==="mot" || d.mot_result || d.mot_work_needed){
-    if(!isMotSelected()){ selTypes.push("MOT"); buildChips(); }
-    if(d.mot_result) setMotResult(String(d.mot_result).toLowerCase()==="fail"?"fail":"pass");
-    if(d.mot_work_needed) $("#motWork").value=d.mot_work_needed;
-  }
-}
 function applyScan(d){
-  if(!d || typeof d!=="object") return;
-  let list = Array.isArray(d.jobs)&&d.jobs.length ? d.jobs : null;
-  if(!list){ list=[{ description:d.work_done, job_type:(d.mot_result||d.document_type==="mot")?"MOT":null,
-    labour_charged:d.labour_charged, parts_charged:d.parts_charged }]; }
-  if(list.length>1){ openScanReview(d, list); }
-  else { fillSingle(d, list[0]); window.scrollTo({top:0,behavior:"smooth"}); }
-}
-function fillSingle(d, job){
+  if(!d||typeof d!=="object") return;
   fillShared(d);
-  const ty=mapType(job.job_type);
-  if(ty && !selTypes.some(t=>t.toLowerCase()===ty.toLowerCase())){ selTypes.push(ty); buildChips(); }
-  if(job.description) $("#notes").value=job.description;
-  if(job.labour_charged!=null && job.labour_charged!=="") $("#labourCharged").value=job.labour_charged;
-  if(job.parts_charged!=null && job.parts_charged!=="") $("#partsCharged").value=job.parts_charged;
-  applyMot(d); toggleSmallDesc(); toggleMot();
-}
-function openScanReview(d, list){
-  scanD=d; scanList=list;
-  const box=$("#scanReviewList"); box.innerHTML="";
+  let list=Array.isArray(d.jobs)&&d.jobs.length?d.jobs:null;
+  if(!list){ list=[{description:d.work_done, job_type:(d.mot_result||d.document_type==="mot")?"MOT":null, labour_charged:d.labour_charged, parts_charged:d.parts_charged}]; }
+  const isMotDoc=(d.document_type==="mot"||d.mot_result);
+  clearBlocks();
   list.forEach(job=>{
-    const ty=mapType(job.job_type)||"Small job";
-    const lab=Number(job.labour_charged)||0, prt=Number(job.parts_charged)||0;
-    const el=document.createElement("div"); el.className="cust-opt";
-    el.innerHTML=`<div style="font-weight:700;">${esc(ty)}</div><div class="cars">${esc(job.description||"")}</div>
-      <div class="meta">Labour ${gbp(lab)} · Parts ${gbp(prt)}</div>`;
-    box.appendChild(el);
+    const ty=mapType(job.job_type)||(isMotDoc?"MOT":"");
+    const bid=addBlock({ type:ty, labour:job.labour_charged, partsCharged:job.parts_charged, notes:job.description });
+    if(ty.toLowerCase()==="mot"){ const b=blkState(bid);
+      b.motResult=(d.mot_result?(String(d.mot_result).toLowerCase()==="fail"?"fail":"pass"):null);
+      const el=$("#blk-"+bid); if(d.mot_work_needed) el.querySelector(".blkMotWork").value=d.mot_work_needed;
+      updateBlkMot(bid); renderBlkMotRes(bid); }
   });
-  $("#scanReviewModal").classList.add("open");
-}
-function closeScanReview(){ $("#scanReviewModal").classList.remove("open"); }
-function fillMerged(){
-  const d=scanD, list=scanList||[]; closeScanReview(); fillShared(d);
-  list.forEach(job=>{ const ty=mapType(job.job_type); if(ty && !selTypes.some(t=>t.toLowerCase()===ty.toLowerCase())) selTypes.push(ty); });
-  buildChips();
-  const lab=list.reduce((a,j)=>a+(Number(j.labour_charged)||0),0);
-  const prt=list.reduce((a,j)=>a+(Number(j.parts_charged)||0),0);
-  if(lab) $("#labourCharged").value=lab;
-  if(prt) $("#partsCharged").value=prt;
-  $("#notes").value=list.map(j=>j.description).filter(Boolean).join("; ");
-  applyMot(d); toggleSmallDesc(); toggleMot();
+  if(!blocks.length) addBlock();
   window.scrollTo({top:0,behavior:"smooth"});
-}
-function createSplitJobs(){
-  const d=scanD, list=scanList||[];
-  const name=(d.customer_name||"").trim(); let custId="";
-  if(name){ const m=customersByName(name); if(m.length){ custId=m[0].id; }
-    else { const c={id:uid(),name:name,phone:"",createdAt:new Date().toISOString(),cars:[]}; customers.push(c); custId=c.id; save(LS_CUST,customers); if(sb)pushCustomer(c); } }
-  const reg=(d.registration||"").toUpperCase(), make=d.make||"", model=d.model||"";
-  const date=(d.date&&/^\d{4}-\d{2}-\d{2}$/.test(d.date))?d.date:today();
-  if(custId && reg){ addCar(custId,{reg,make,model}); if(sb)pushCustomer(getCustomer(custId)); }
-  list.forEach(job=>{
-    const ty=mapType(job.job_type)||"Small job";
-    const j={ id:uid(), createdAt:new Date().toISOString(), date, jobTypes:[ty], jobType:ty, actualMins:0,
-      labourCharged:Number(job.labour_charged)||0, partsCharged:Number(job.parts_charged)||0, partsCost:0,
-      make, model, ageYears:null, quotedHours:0, customer:name, reg, customerId:custId,
-      notes:job.description||"", comeback:false, motResult:null, motWork:"", motCostUs:0, motCostCustomer:0, synced:false };
-    jobs.unshift(j); if(sb)pushOne(j);
-  });
-  save(LS_JOBS,jobs); closeScanReview(); clearForm(); renderJobs(); renderStats();
-  toast("Created "+list.length+" jobs to finish"); showView("jobs");
 }
 function editJob(id){
   const j=jobs.find(x=>x.id===id); if(!j) return;
-  editingId=id; selTypes=jobTypesOf(j).slice(); comeback=!!j.comeback; selCustomerId=j.customerId||null;
-  swReset();
-  buildChips();
+  editingId=id; selCustomerId=j.customerId||null;
   $("#jobDate").value=j.date;
-  $("#hrs").value=Math.floor(j.actualMins/60)||""; $("#mins").value=j.actualMins%60||"";
-  $("#labourCharged").value=j.labourCharged||""; $("#partsCharged").value=j.partsCharged||""; $("#partsCost").value=j.partsCost||"";
   $("#customer").value=j.customer||""; $("#reg").value=j.reg||"";
   const lc=getCustomer(j.customerId); $("#phone").value=(lc&&lc.phone)?lc.phone:"";
-  $("#make").value=j.make||""; $("#model").value=j.model||"";
-  showRegAge();
-  $("#notes").value=j.notes||"";
-  $("#motWork").value=j.motWork||""; $("#motCostUs").value=j.motCostUs||""; $("#motCostCustomer").value=j.motCostCustomer||"";
-  setMotResult(j.motResult||null);
-  toggleSmallDesc(); toggleMot();
+  $("#make").value=j.make||""; $("#model").value=j.model||""; showRegAge();
   renderCustomerCars();
+  clearBlocks();
+  addBlock({ type:(jobTypesOf(j)[0]||""), mins:j.actualMins, labour:j.labourCharged, partsCharged:j.partsCharged, partsCost:j.partsCost,
+    notes:j.notes, motResult:j.motResult, motWork:j.motWork, motCostUs:j.motCostUs, motCostCustomer:j.motCostCustomer });
   $("#saveBtn").textContent="Update job"; $("#cancelBtn").style.display="flex"; $("#deleteBtn").style.display="flex";
   $("#addAnotherBtn").style.display="none";
   setCompleteBtn();
-  showView("log");
+  showView("log"); window.scrollTo(0,0);
 }
 function setCompleteBtn(){
   const ej=editingId?jobs.find(x=>x.id===editingId):null;
@@ -860,15 +782,13 @@ function deleteJob(){
   });
 }
 function clearForm(){
-  selTypes=[]; comeback=false; editingId=null; selCustomerId=null; pending=null; selMot=null;
-  ["hrs","mins","labourCharged","partsCharged","partsCost","make","model","customer","phone","reg","notes","smallDesc","motWork","motCostUs","motCostCustomer"].forEach(id=>$("#"+id).value="");
-  $("#customerCars").innerHTML=""; setMotResult(null); $("#regAge").textContent="";
-  $("#jobDate").value=today();
-  buildChips(); toggleSmallDesc(); toggleMot();
-  $("#saveBtn").textContent="Save job"; $("#cancelBtn").style.display="none"; $("#deleteBtn").style.display="none";
+  editingId=null; selCustomerId=null; pendingLog=null;
+  ["customer","phone","reg","make","model"].forEach(id=>$("#"+id).value="");
+  $("#customerCars").innerHTML=""; $("#regAge").textContent=""; $("#jobDate").value=today();
+  clearBlocks(); addBlock();
+  $("#saveBtn").textContent="Save"; $("#cancelBtn").style.display="none"; $("#deleteBtn").style.display="none";
   $("#addAnotherBtn").style.display="flex";
-  const cb=$("#completeBtn"); cb.textContent="Mark complete ✓"; cb.className="btn blue"; cb._reopen=false;
-  swReset();
+  const cb=$("#completeBtn"); cb.textContent="Mark all complete ✓"; cb.className="btn blue"; cb._reopen=false;
   window.scrollTo({top:0,behavior:"smooth"});
 }
 
@@ -1116,7 +1036,7 @@ async function loadOptions(){
         if(md && !modelsForMake(parts[0]).some(x=>x.toLowerCase()===md.toLowerCase())){ (customModelsByMake[mk]=customModelsByMake[mk]||[]).push(md); changed=true; } } }
       else if(o.kind==="jobtype" && !allJobTypes().some(x=>x.toLowerCase()===v.toLowerCase())){ customTypes.push(v); changed=true; }
     });
-    if(changed){ save(LS_MAKES,customMakes); save(LS_MODELS,customModelsByMake); save(LS_TYPES,customTypes); buildChips(); }
+    if(changed){ save(LS_MAKES,customMakes); save(LS_MODELS,customModelsByMake); save(LS_TYPES,customTypes); populateTypeOptions(); }
   }catch(e){}
 }
 function rowFor(j){ return { id:j.id, created_at:j.createdAt, job_date:j.date, job_type:typeLabel(j), make:j.make,
@@ -1142,26 +1062,26 @@ function showView(v){
 customTypes=customTypes.filter(t=>!JOB_TYPES.some(s=>s.toLowerCase()===(t||"").toLowerCase())); save(LS_TYPES,customTypes);
 if(localStorage.getItem("joblog.migrate.v2")!=="1"){ jobs.forEach(j=>{ j.closed=(jobTotal(j)>0); j.synced=false; }); save(LS_JOBS,jobs); localStorage.setItem("joblog.migrate.v2","1"); }
 else { jobs.forEach(j=>{ if(j.closed===undefined) j.closed=(jobTotal(j)>0); }); save(LS_JOBS,jobs); }
-buildChips();
+populateTypeOptions();
 attachCombo($("#make"), $("#makeList"), allMakes, ()=>{ $("#modelList").classList.remove("open"); }, "make");
 attachCombo($("#model"), $("#modelList"), ()=>modelsForMake($("#make").value), null, "model");
 attachCombo($("#customer"), $("#customerList"), ()=>uniqSort(customers.map(c=>c.name)), onPickCustomer, null);
 $("#customer").addEventListener("input", ()=>{ const c=getCustomer(selCustomerId);
   if(!c || c.name.toLowerCase()!==$("#customer").value.trim().toLowerCase()){ selCustomerId=null; $("#customerCars").innerHTML=""; } });
 $("#reg").addEventListener("input", function(){ const p=this.selectionStart; this.value=this.value.toUpperCase(); this.setSelectionRange&&this.setSelectionRange(p,p); showRegAge(); });
-$("#completeBtn").onclick=function(){ if(this._reopen) reopenJob(); else saveJob(true); };
+$("#completeBtn").onclick=function(){ if(this._reopen) reopenJob(); else saveLog(true); };
 $("#jobFilter").addEventListener("click",function(e){ const c=e.target.closest(".chip"); if(!c) return; jobFilter=c.dataset.f;
   [...this.children].forEach(x=>x.classList.toggle("on",x===c)); viewDate=null; renderJobs(); });
 $("#bdEditBtn").onclick=function(){ closeBreakdown(); if(bdJobId) editJob(bdJobId); };
 $("#bdCloseBtn").onclick=closeBreakdown;
-$("#swToggle").onclick=swToggle;
-$("#swReset").onclick=swReset;
-$("#addAnotherBtn").onclick=()=>saveJob(false,true);
-$("#scanSplitBtn").onclick=createSplitJobs;
-$("#scanOneBtn").onclick=fillMerged;
-$("#typeSearch").addEventListener("input", filterChips);
-$("#smallDesc").addEventListener("input",function(){ $("#notes").value=this.value; });
-$("#motResultChips").addEventListener("click",function(e){ const c=e.target.closest(".chip"); if(!c) return; setMotResult(selMot===c.dataset.mot?null:c.dataset.mot); });
+$("#addAnotherBtn").onclick=()=>{ addBlock(); window.scrollTo({top:document.body.scrollHeight,behavior:"smooth"}); };
+$("#jobBlocks").addEventListener("click",e=>{
+  const q=e.target.closest(".blkQuick"); if(q){ const el=$("#blk-"+q.dataset.id); el.querySelector(".blkType").value=q.textContent; updateBlkMot(+q.dataset.id); return; }
+  const rm=e.target.closest(".blkRemove"); if(rm){ removeBlock(+rm.dataset.id); return; }
+  const sw=e.target.closest(".blkSw"); if(sw){ blkSwToggle(+sw.dataset.id); return; }
+  const mr=e.target.closest(".blkMotRes .chip"); if(mr){ const bid=+mr.closest(".blkMotRes").dataset.id; const b=blkState(bid); if(b){ b.motResult=(b.motResult===mr.dataset.mot?null:mr.dataset.mot); renderBlkMotRes(bid); } return; }
+});
+$("#jobBlocks").addEventListener("input",e=>{ const t=e.target.closest(".blkType"); if(t) updateBlkMot(+t.dataset.id); });
 $("#scanBtn").onclick=()=>$("#invFile").click();
 $("#invFile").onchange=function(){ if(this.files&&this.files[0]) scanInvoice(this.files[0]); this.value=""; };
 $("#partsScanBtn").onclick=()=>$("#partsFile").click();
@@ -1171,7 +1091,7 @@ $("#addPurchaseManualBtn").onclick=()=>openPurchase({},null);
 $("#pSaveBtn").onclick=savePurchase; $("#pCancelBtn").onclick=closePurchase; $("#pDeleteBtn").onclick=deletePurchase;
 $("#exportPurchasesBtn").onclick=exportPurchasesCSV;
 $("#pNet").addEventListener("input",recalcGross); $("#pVat").addEventListener("input",recalcGross);
-$("#saveBtn").onclick=saveJob;
+$("#saveBtn").onclick=()=>saveLog(false);
 $("#cancelBtn").onclick=function(){ clearForm(); showView("jobs"); };
 $("#deleteBtn").onclick=deleteJob;
 $("#dupCancel").onclick=closeDupModal;
@@ -1184,7 +1104,7 @@ $("#settingsBack").onclick=function(){ showView("log"); };
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{
   const v=b.dataset.view; if(v!=="log" && editingId) clearForm(); if(v==="jobs") viewDate=null; showView(v); });
 document.addEventListener("click",e=>{ if(!e.target.closest(".combo")) document.querySelectorAll(".combo-list").forEach(l=>l.classList.remove("open")); });
-$("#jobDate").value=today();
+clearForm();
 window.addEventListener("load", initSupa);
 document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") pullAll(); });
 renderJobs(); renderStats();
