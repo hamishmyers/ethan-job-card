@@ -934,9 +934,32 @@ function pushPurchase(p){ if(!sb||!p) return; try{ sb.from("purchases").upsert({
 function setCloudBadge(on){ document.querySelectorAll("#cloudBadge,#cloudBadge2").forEach(b=>{ b.textContent=on?"cloud":"local"; b.classList.toggle("on",on); }); }
 function initSupa(){
   if(supa.url && supa.key && window.supabase){
-    try{ sb=window.supabase.createClient(supa.url,supa.key); setCloudBadge(true); flushUnsynced(); }
+    try{ sb=window.supabase.createClient(supa.url,supa.key); setCloudBadge(true); flushUnsynced(); pullAll(); }
     catch(e){ sb=null; setCloudBadge(false); }
   }
+}
+function jobFromRow(r){ return { id:r.id, createdAt:r.created_at, date:r.job_date,
+  jobType:r.job_type, jobTypes:String(r.job_type||"").split(" + ").map(s=>s.trim()).filter(Boolean),
+  make:r.make||"", model:r.model||"", reg:r.reg||"", customerId:r.customer_id||"",
+  ageYears:r.age_years, actualMins:Number(r.actual_mins)||0, quotedHours:Number(r.quoted_hours)||0,
+  labourCharged:Number(r.labour_charged)||0, partsCharged:Number(r.parts_charged)||0, partsCost:Number(r.parts_cost)||0,
+  motResult:r.mot_result||null, motWork:r.mot_work||"", motCostUs:Number(r.mot_cost_us)||0, motCostCustomer:Number(r.mot_cost_customer)||0,
+  customer:r.customer||"", notes:r.notes||"", comeback:!!r.comeback, synced:true }; }
+function custFromRow(r){ return { id:r.id, name:r.name||"", phone:r.phone||"", cars:Array.isArray(r.cars)?r.cars:(r.cars||[]), createdAt:r.created_at }; }
+function purchFromRow(r){ return { id:r.id, createdAt:r.created_at, date:r.purchase_date, supplier:r.supplier||"", net:Number(r.net)||0, vat:Number(r.vat)||0, gross:Number(r.gross)||0, notes:r.notes||"" }; }
+function mergeJobs(remote){ const byId={}; jobs.forEach(j=>byId[j.id]=j);
+  remote.forEach(r=>{ const ex=byId[r.id]; if(!(ex && ex.synced===false)) byId[r.id]=r; });
+  jobs=Object.values(byId).sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||""))); save(LS_JOBS,jobs); }
+function mergeCustomers(remote){ const byId={}; customers.forEach(c=>byId[c.id]=c); remote.forEach(r=>{ byId[r.id]=r; }); customers=Object.values(byId); save(LS_CUST,customers); }
+function mergePurchases(remote){ const byId={}; purchases.forEach(p=>byId[p.id]=p); remote.forEach(r=>{ byId[r.id]=r; }); purchases=Object.values(byId); save("joblog.purchases.v1",purchases); }
+let pulling=false;
+async function pullAll(){ if(!sb||pulling) return; pulling=true;
+  try{
+    const jr=await sb.from("jobs").select("*"); if(jr&&jr.data) mergeJobs(jr.data.map(jobFromRow));
+    const cr=await sb.from("customers").select("*"); if(cr&&cr.data) mergeCustomers(cr.data.map(custFromRow));
+    const pr=await sb.from("purchases").select("*"); if(pr&&pr.data) mergePurchases(pr.data.map(purchFromRow));
+    renderJobs(); renderStats(); renderPurchases();
+  }catch(e){} finally{ pulling=false; }
 }
 function flushUnsynced(){
   if(!sb) return;
@@ -1019,6 +1042,7 @@ document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{
 document.addEventListener("click",e=>{ if(!e.target.closest(".combo")) document.querySelectorAll(".combo-list").forEach(l=>l.classList.remove("open")); });
 $("#jobDate").value=today();
 window.addEventListener("load", initSupa);
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") pullAll(); });
 renderJobs(); renderStats();
 </script>
 </body>
