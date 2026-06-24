@@ -164,6 +164,8 @@
       <button class="btn blue" id="scanBtn">📷 Scan an invoice or MOT sheet</button>
       <div class="hint-inline" style="text-align:center; margin-bottom:4px;">Photograph it to auto-fill, then just add your time</div>
       <input type="file" accept="image/*" capture="environment" id="invFile" style="display:none" />
+      <button class="btn grey" id="partsScanBtn" style="margin-top:8px;">📦 Scan a parts invoice (for VAT)</button>
+      <input type="file" accept="image/*" capture="environment" id="partsFile" style="display:none" />
 
       <div class="divider">Or enter manually</div>
 
@@ -281,6 +283,17 @@
     </div>
   </section>
 
+  <!-- PARTS / PURCHASES -->
+  <section id="view-parts" style="display:none;">
+    <h1>Parts buys</h1>
+    <div class="sub">Supplier invoices, stored for VAT</div>
+    <button class="btn blue" id="addPurchaseBtn">📦 Scan a parts invoice</button>
+    <button class="btn grey" id="addPurchaseManualBtn">+ Add manually</button>
+    <div class="card" id="purchaseTotals" style="margin-top:14px;"></div>
+    <div id="purchaseList"></div>
+    <button class="export-link" id="exportPurchasesBtn" style="margin-top:8px;">⬇ Export purchases CSV</button>
+  </section>
+
   <!-- SETTINGS -->
   <section id="view-settings" style="display:none;">
     <button class="btn grey" id="settingsBack" style="margin-bottom:14px;">‹ Back</button>
@@ -303,6 +316,7 @@
 <nav>
   <button data-view="log" class="on"><span class="ic">✏️</span>Log</button>
   <button data-view="jobs"><span class="ic">📋</span>Jobs</button>
+  <button data-view="parts"><span class="ic">📦</span>Parts</button>
   <button data-view="stats"><span class="ic">📊</span>Stats</button>
 </nav>
 
@@ -314,6 +328,27 @@
     <div class="sub" id="dupSub"></div>
     <div id="dupOptions"></div>
     <button class="btn grey" id="dupCancel" style="margin-top:4px;">Cancel</button>
+  </div>
+</div>
+
+<div class="modal" id="purchaseModal">
+  <div class="modal-card">
+    <h3 id="purchaseTitle">Parts invoice</h3>
+    <label>Supplier</label>
+    <input id="pSupplier" placeholder="e.g. Euro Car Parts" autocomplete="off" />
+    <label>Date</label>
+    <input id="pDate" type="date" />
+    <div class="row">
+      <div><label>Net (ex VAT)</label><div class="affix"><span>£</span><input id="pNet" type="number" inputmode="decimal" placeholder="0" /></div></div>
+      <div><label>VAT</label><div class="affix"><span>£</span><input id="pVat" type="number" inputmode="decimal" placeholder="0" /></div></div>
+    </div>
+    <label>Gross (inc VAT)</label>
+    <div class="affix"><span>£</span><input id="pGross" type="number" inputmode="decimal" placeholder="0" /></div>
+    <label>Note <span class="opt">(optional)</span></label>
+    <input id="pNote" placeholder="What it was for" autocomplete="off" />
+    <button class="btn green" id="pSaveBtn" style="margin-top:16px;">Save</button>
+    <button class="btn red" id="pDeleteBtn" style="display:none;">Delete</button>
+    <button class="btn grey" id="pCancelBtn">Cancel</button>
   </div>
 </div>
 
@@ -363,6 +398,8 @@ const SUPA_DEFAULT = { url:"https://gvyvjfldvbwdiexjyxzh.supabase.co", key:"sb_p
 /* ---------- state ---------- */
 let jobs = load(LS_JOBS, []);
 let customers = load(LS_CUST, []);
+let purchases = load("joblog.purchases.v1", []);
+let editingPurchaseId = null;
 let customMakes = load(LS_MAKES, []), customModels = load(LS_MODELS, []), customTypes = load(LS_TYPES, []);
 let selTypes=[], comeback=false, editingId=null, viewDate=null, selCustomerId=null, pending=null, selMot=null, ageSet=false;
 let supa = load(LS_SUPA, SUPA_DEFAULT);
@@ -576,6 +613,7 @@ function fileToResizedB64(file, maxDim, cb){
 }
 function scanInvoice(file){
   if(!file) return;
+  $("#scanMsg").textContent="Reading invoice…";
   $("#scanModal").classList.add("open");
   fileToResizedB64(file, 1600, async (b64)=>{
     if(!b64){ closeScan(); toast("Couldn't read that image"); return; }
@@ -823,6 +861,76 @@ function exportCSV(){
 }
 
 /* ---------- supabase ---------- */
+function recalcGross(){ if($("#pNet").value||$("#pVat").value){ const n=Number($("#pNet").value)||0, v=Number($("#pVat").value)||0; $("#pGross").value=Math.round((n+v)*100)/100; } }
+function openPurchase(data, id){
+  data=data||{}; editingPurchaseId=id||null;
+  $("#purchaseTitle").textContent=id?"Edit parts invoice":"Parts invoice";
+  $("#pSupplier").value=data.supplier||"";
+  $("#pDate").value=(data.date&&/^\d{4}-\d{2}-\d{2}$/.test(data.date))?data.date:today();
+  $("#pNet").value=(data.net!=null&&data.net!=="")?data.net:"";
+  $("#pVat").value=(data.vat!=null&&data.vat!=="")?data.vat:"";
+  $("#pGross").value=(data.gross!=null&&data.gross!=="")?data.gross:"";
+  $("#pNote").value=data.notes||data.description||"";
+  $("#pDeleteBtn").style.display=id?"flex":"none";
+  $("#purchaseModal").classList.add("open");
+}
+function closePurchase(){ $("#purchaseModal").classList.remove("open"); editingPurchaseId=null; }
+function savePurchase(){
+  const p={ supplier:$("#pSupplier").value.trim(), date:$("#pDate").value||today(),
+    net:Number($("#pNet").value)||0, vat:Number($("#pVat").value)||0, gross:Number($("#pGross").value)||0, notes:$("#pNote").value.trim() };
+  if(!p.supplier && !p.gross && !p.net){ toast("Add a supplier or amount"); return; }
+  if(editingPurchaseId){ const e=purchases.find(x=>x.id===editingPurchaseId); if(e){ Object.assign(e,p); if(sb)pushPurchase(e); } }
+  else { const np={ id:uid(), createdAt:new Date().toISOString(), ...p }; purchases.unshift(np); if(sb)pushPurchase(np); }
+  save("joblog.purchases.v1",purchases); closePurchase(); renderPurchases(); toast("Saved ✓");
+}
+function deletePurchase(){
+  if(!editingPurchaseId) return; const id=editingPurchaseId;
+  showConfirm("Delete this parts invoice?","",()=>{ purchases=purchases.filter(x=>x.id!==id); save("joblog.purchases.v1",purchases);
+    if(sb){ sb.from("purchases").delete().eq("id",id).then(()=>{}); } closePurchase(); renderPurchases(); toast("Deleted"); });
+}
+function renderPurchases(){
+  const list=$("#purchaseList"), tot=$("#purchaseTotals");
+  if(!purchases.length){ tot.innerHTML=""; list.innerHTML='<div class="empty">No parts invoices yet. Scan one to start.</div>'; return; }
+  const net=purchases.reduce((a,p)=>a+(Number(p.net)||0),0);
+  const vat=purchases.reduce((a,p)=>a+(Number(p.vat)||0),0);
+  const gross=purchases.reduce((a,p)=>a+(Number(p.gross)||0),0);
+  tot.innerHTML=`<div class="stat"><span>Total net (ex VAT)</span><span class="v">${gbp(net)}</span></div>
+    <div class="stat"><span>Total VAT</span><span class="v">${gbp(vat)}</span></div>
+    <div class="stat"><span>Total gross</span><span class="v">${gbp(gross)}</span></div>
+    <div class="stat"><span>Invoices</span><span class="v">${purchases.length}</span></div>`;
+  list.innerHTML="";
+  purchases.slice().sort((a,b)=>(b.date||"").localeCompare(a.date||"")).forEach(p=>{
+    const d=document.createElement("div"); d.className="job"; d.style.cursor="pointer";
+    d.innerHTML=`<div class="top"><div><div class="ty">${esc(p.supplier||"Parts invoice")}</div>
+      <div class="meta">${fmtDate(p.date)}${p.notes?" · "+esc(p.notes):""}</div>
+      <div class="meta">net ${gbp(p.net||0)} · VAT ${gbp(p.vat||0)}</div></div>
+      <div class="gph" style="color:var(--txt);">${gbp(p.gross||0)}</div></div>
+      <div class="meta" style="margin-top:9px; color:var(--accent2);">Tap to edit ›</div>`;
+    d.onclick=()=>openPurchase(p, p.id);
+    list.appendChild(d);
+  });
+}
+function exportPurchasesCSV(){
+  if(!purchases.length){ toast("No purchases to export"); return; }
+  const cols=["date","supplier","net","vat","gross","notes","createdAt"];
+  const escc=v=>{ v=(v==null?"":String(v)); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
+  const csv=cols.join(",")+"\n"+purchases.map(p=>cols.map(c=>escc(p[c])).join(",")).join("\n");
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+  a.download="parts-invoices-"+today()+".csv"; a.click(); toast("Exported");
+}
+function scanParts(file){
+  if(!file) return; $("#scanModal").classList.add("open"); $("#scanMsg").textContent="Reading parts invoice…";
+  fileToResizedB64(file,1600, async(b64)=>{
+    if(!b64){ closeScan(); toast("Couldn't read that image"); return; }
+    try{ const r=await fetch("/api/scan",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({image:b64, media_type:"image/jpeg", mode:"parts"})});
+      const d=await r.json(); closeScan();
+      if(!r.ok){ toast(d.error||"Scan failed"); return; }
+      openPurchase({ supplier:d.supplier, date:d.date, net:d.net, vat:d.vat, gross:d.gross, notes:d.description }, null);
+    }catch(e){ closeScan(); toast("Scan failed"); }
+  });
+}
+function pushPurchase(p){ if(!sb||!p) return; try{ sb.from("purchases").upsert({ id:p.id, created_at:p.createdAt, purchase_date:p.date, supplier:p.supplier, net:p.net, vat:p.vat, gross:p.gross, notes:p.notes }).then(()=>{}); }catch(e){} }
+
 function setCloudBadge(on){ document.querySelectorAll("#cloudBadge,#cloudBadge2").forEach(b=>{ b.textContent=on?"cloud":"local"; b.classList.toggle("on",on); }); }
 function initSupa(){
   if(supa.url && supa.key && window.supabase){
@@ -837,6 +945,7 @@ function flushUnsynced(){
   customMakes.forEach(v=>pushOption("make",v));
   customModels.forEach(v=>pushOption("model",v));
   customTypes.forEach(v=>pushOption("jobtype",v));
+  purchases.forEach(p=>pushPurchase(p));
   loadOptions();
 }
 async function pushOption(kind,value){ if(!sb||!value) return; try{ await sb.from("options").upsert({kind,value},{onConflict:"kind,value"}); }catch(e){} }
@@ -864,9 +973,9 @@ async function pushCustomer(c){ if(!sb||!c) return; try{ await sb.from("customer
 
 /* ---------- nav ---------- */
 function showView(v){
-  ["log","jobs","stats","settings"].forEach(n=>$("#view-"+n).style.display=(n===v?"block":"none"));
+  ["log","jobs","parts","stats","settings"].forEach(n=>$("#view-"+n).style.display=(n===v?"block":"none"));
   document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b.dataset.view===v));
-  if(v==="jobs") renderJobs(); if(v==="stats") renderStats();
+  if(v==="jobs") renderJobs(); if(v==="stats") renderStats(); if(v==="parts") renderPurchases();
   window.scrollTo(0,0);
 }
 
@@ -887,6 +996,13 @@ $("#smallDesc").addEventListener("input",function(){ $("#notes").value=this.valu
 $("#motResultChips").addEventListener("click",function(e){ const c=e.target.closest(".chip"); if(!c) return; setMotResult(selMot===c.dataset.mot?null:c.dataset.mot); });
 $("#scanBtn").onclick=()=>$("#invFile").click();
 $("#invFile").onchange=function(){ if(this.files&&this.files[0]) scanInvoice(this.files[0]); this.value=""; };
+$("#partsScanBtn").onclick=()=>$("#partsFile").click();
+$("#partsFile").onchange=function(){ if(this.files&&this.files[0]) scanParts(this.files[0]); this.value=""; };
+$("#addPurchaseBtn").onclick=()=>$("#partsFile").click();
+$("#addPurchaseManualBtn").onclick=()=>openPurchase({},null);
+$("#pSaveBtn").onclick=savePurchase; $("#pCancelBtn").onclick=closePurchase; $("#pDeleteBtn").onclick=deletePurchase;
+$("#exportPurchasesBtn").onclick=exportPurchasesCSV;
+$("#pNet").addEventListener("input",recalcGross); $("#pVat").addEventListener("input",recalcGross);
 $("#saveBtn").onclick=saveJob;
 $("#cancelBtn").onclick=function(){ clearForm(); showView("jobs"); };
 $("#deleteBtn").onclick=deleteJob;

@@ -11,7 +11,13 @@ export default async function handler(req, res) {
     const mediaType = (body && body.media_type) || "image/jpeg";
     if (!image) { res.status(400).json({ error: "No image provided" }); return; }
 
-    const prompt = `You are reading a UK car garage document: either a mechanic's invoice/job sheet OR an MOT test certificate/failure sheet. ` +
+    const mode = body && body.mode;
+    const partsPrompt = `You are reading a UK supplier PARTS invoice or receipt (parts a garage has bought from a supplier). ` +
+      `Respond with ONLY a JSON object (no prose, no markdown fences) with exactly these keys:\n` +
+      `{"supplier": string|null, "date": string|null, "net": number|null, "vat": number|null, "gross": number|null, "description": string|null}\n` +
+      `Rules: date as ISO yyyy-mm-dd if you can determine it. net = total EXCLUDING VAT in GBP. vat = the VAT amount in GBP. gross = total INCLUDING VAT in GBP. ` +
+      `description = a brief summary of the items bought. Numbers must be plain numbers with no currency symbol or commas. Use null for anything not clearly present.`;
+    const invoicePrompt = `You are reading a UK car garage document: either a mechanic's invoice/job sheet OR an MOT test certificate/failure sheet. ` +
       `Figure out which it is and extract the fields. Respond with ONLY a JSON object (no prose, no markdown fences) with exactly these keys:\n` +
       `{"document_type": "invoice"|"mot"|null, "customer_name": string|null, "registration": string|null, "make": string|null, "model": string|null, ` +
       `"date": string|null, "total": number|null, "mot_result": "pass"|"fail"|null, "mot_work_needed": string|null, ` +
@@ -21,6 +27,8 @@ export default async function handler(req, res) {
       `Only return multiple elements when the document clearly covers genuinely separate jobs (e.g. a service AND unrelated brake work). job_type = a short category like Service, Brakes, Clutch, Cambelt/Timing, Diagnostics, Suspension, Exhaust, Tyres, Battery/Electrical, Aircon, MOT, Engine, Welding, or null. ` +
       `For an MOT sheet: set document_type "mot", mot_result to pass or fail, mot_work_needed to a concise list of failure items and advisories, and jobs to an empty array. ` +
       `Numbers must be plain numbers with no currency symbol or commas. Use null for anything not clearly present.`;
+
+    const prompt = mode === "parts" ? partsPrompt : invoicePrompt;
 
     const r = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
