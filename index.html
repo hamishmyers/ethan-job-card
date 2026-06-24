@@ -171,7 +171,7 @@
 
       <label>Job type <span class="opt">(tap all that apply)</span></label>
       <input id="typeSearch" placeholder="Search any job type…" autocomplete="off" style="margin-bottom:8px;" />
-      <div class="hint-inline" style="margin:0 0 8px;">Quick picks below — search above for anything else</div>
+      <div class="hint-inline" style="margin:0 0 8px;">Common ones first — tap any, or search to narrow</div>
       <div class="chips" id="jobTypeChips"></div>
       <div id="smallDescBlock" style="display:none;">
         <label>What was the job?</label>
@@ -527,8 +527,7 @@ function filterChips(){
   [...$("#jobTypeChips").children].forEach(c=>{
     if(c.classList.contains("add")){ c.style.display="flex"; return; }
     const t=(c.textContent||"").toLowerCase();
-    const show = q ? (t.includes(q)||PINNED_TYPES.includes(t)||c.classList.contains("on"))
-                   : (PINNED_TYPES.includes(t)||c.classList.contains("on"));
+    const show = q ? (t.includes(q)||PINNED_TYPES.includes(t)||c.classList.contains("on")) : true;
     c.style.display = show ? "flex" : "none";
   });
 }
