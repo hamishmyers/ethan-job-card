@@ -317,6 +317,16 @@
   </div>
 </div>
 
+<div class="modal" id="scanReviewModal">
+  <div class="modal-card">
+    <h3>Found a few jobs on this</h3>
+    <div class="sub">Split them into separate jobs for the cleanest profit-per-type, or keep as one.</div>
+    <div id="scanReviewList"></div>
+    <button class="btn green" id="scanSplitBtn">Create as separate jobs</button>
+    <button class="btn grey" id="scanOneBtn">Keep as one job</button>
+  </div>
+</div>
+
 <div class="modal" id="scanModal">
   <div class="modal-card" style="text-align:center;">
     <h3 id="scanMsg">Reading invoice…</h3>
@@ -579,23 +589,86 @@ function scanInvoice(file){
   });
 }
 function closeScan(){ $("#scanModal").classList.remove("open"); }
-function applyScan(d){
-  if(!d || typeof d!=="object") return;
+let scanD=null, scanList=null;
+function mapType(s){ if(!s) return null; const l=String(s).toLowerCase().trim();
+  let m=allJobTypes().find(t=>t.toLowerCase()===l); if(m) return m;
+  m=allJobTypes().find(t=>l.includes(t.toLowerCase())); if(m) return m;
+  if(l.includes("mot")) return "MOT"; return null; }
+function fillShared(d){
   if(d.customer_name){ $("#customer").value=d.customer_name; onPickCustomer(d.customer_name); }
   if(d.registration) $("#reg").value=String(d.registration).toUpperCase();
   if(d.make) $("#make").value=d.make;
   if(d.model) $("#model").value=d.model;
   if(d.date && /^\d{4}-\d{2}-\d{2}$/.test(d.date)) $("#jobDate").value=d.date;
-  if(d.work_done) $("#notes").value=d.work_done;
-  if(d.labour_charged!=null && d.labour_charged!=="") $("#labourCharged").value=d.labour_charged;
-  if(d.parts_charged!=null && d.parts_charged!=="") $("#partsCharged").value=d.parts_charged;
+}
+function applyMot(d){
   if(d.document_type==="mot" || d.mot_result || d.mot_work_needed){
     if(!isMotSelected()){ selTypes.push("MOT"); buildChips(); }
-    toggleMot();
     if(d.mot_result) setMotResult(String(d.mot_result).toLowerCase()==="fail"?"fail":"pass");
     if(d.mot_work_needed) $("#motWork").value=d.mot_work_needed;
   }
+}
+function applyScan(d){
+  if(!d || typeof d!=="object") return;
+  let list = Array.isArray(d.jobs)&&d.jobs.length ? d.jobs : null;
+  if(!list){ list=[{ description:d.work_done, job_type:(d.mot_result||d.document_type==="mot")?"MOT":null,
+    labour_charged:d.labour_charged, parts_charged:d.parts_charged }]; }
+  if(list.length>1){ openScanReview(d, list); }
+  else { fillSingle(d, list[0]); window.scrollTo({top:0,behavior:"smooth"}); }
+}
+function fillSingle(d, job){
+  fillShared(d);
+  const ty=mapType(job.job_type);
+  if(ty && !selTypes.some(t=>t.toLowerCase()===ty.toLowerCase())){ selTypes.push(ty); buildChips(); }
+  if(job.description) $("#notes").value=job.description;
+  if(job.labour_charged!=null && job.labour_charged!=="") $("#labourCharged").value=job.labour_charged;
+  if(job.parts_charged!=null && job.parts_charged!=="") $("#partsCharged").value=job.parts_charged;
+  applyMot(d); toggleSmallDesc(); toggleMot();
+}
+function openScanReview(d, list){
+  scanD=d; scanList=list;
+  const box=$("#scanReviewList"); box.innerHTML="";
+  list.forEach(job=>{
+    const ty=mapType(job.job_type)||"Small job";
+    const lab=Number(job.labour_charged)||0, prt=Number(job.parts_charged)||0;
+    const el=document.createElement("div"); el.className="cust-opt";
+    el.innerHTML=`<div style="font-weight:700;">${esc(ty)}</div><div class="cars">${esc(job.description||"")}</div>
+      <div class="meta">Labour ${gbp(lab)} · Parts ${gbp(prt)}</div>`;
+    box.appendChild(el);
+  });
+  $("#scanReviewModal").classList.add("open");
+}
+function closeScanReview(){ $("#scanReviewModal").classList.remove("open"); }
+function fillMerged(){
+  const d=scanD, list=scanList||[]; closeScanReview(); fillShared(d);
+  list.forEach(job=>{ const ty=mapType(job.job_type); if(ty && !selTypes.some(t=>t.toLowerCase()===ty.toLowerCase())) selTypes.push(ty); });
+  buildChips();
+  const lab=list.reduce((a,j)=>a+(Number(j.labour_charged)||0),0);
+  const prt=list.reduce((a,j)=>a+(Number(j.parts_charged)||0),0);
+  if(lab) $("#labourCharged").value=lab;
+  if(prt) $("#partsCharged").value=prt;
+  $("#notes").value=list.map(j=>j.description).filter(Boolean).join("; ");
+  applyMot(d); toggleSmallDesc(); toggleMot();
   window.scrollTo({top:0,behavior:"smooth"});
+}
+function createSplitJobs(){
+  const d=scanD, list=scanList||[];
+  const name=(d.customer_name||"").trim(); let custId="";
+  if(name){ const m=customersByName(name); if(m.length){ custId=m[0].id; }
+    else { const c={id:uid(),name:name,phone:"",createdAt:new Date().toISOString(),cars:[]}; customers.push(c); custId=c.id; save(LS_CUST,customers); if(sb)pushCustomer(c); } }
+  const reg=(d.registration||"").toUpperCase(), make=d.make||"", model=d.model||"";
+  const date=(d.date&&/^\d{4}-\d{2}-\d{2}$/.test(d.date))?d.date:today();
+  if(custId && reg){ addCar(custId,{reg,make,model}); if(sb)pushCustomer(getCustomer(custId)); }
+  list.forEach(job=>{
+    const ty=mapType(job.job_type)||"Small job";
+    const j={ id:uid(), createdAt:new Date().toISOString(), date, jobTypes:[ty], jobType:ty, actualMins:0,
+      labourCharged:Number(job.labour_charged)||0, partsCharged:Number(job.parts_charged)||0, partsCost:0,
+      make, model, ageYears:null, quotedHours:0, customer:name, reg, customerId:custId,
+      notes:job.description||"", comeback:false, motResult:null, motWork:"", motCostUs:0, motCostCustomer:0, synced:false };
+    jobs.unshift(j); if(sb)pushOne(j);
+  });
+  save(LS_JOBS,jobs); closeScanReview(); clearForm(); renderJobs(); renderStats();
+  toast("Created "+list.length+" jobs to finish"); showView("jobs");
 }
 function editJob(id){
   const j=jobs.find(x=>x.id===id); if(!j) return;
@@ -800,6 +873,8 @@ $("#customer").addEventListener("input", ()=>{ const c=getCustomer(selCustomerId
   if(!c || c.name.toLowerCase()!==$("#customer").value.trim().toLowerCase()){ selCustomerId=null; $("#customerCars").innerHTML=""; } });
 $("#reg").addEventListener("input", function(){ const p=this.selectionStart; this.value=this.value.toUpperCase(); this.setSelectionRange&&this.setSelectionRange(p,p); });
 $("#ageRange").addEventListener("input", ()=>{ ageSet=true; updateAge(); });
+$("#scanSplitBtn").onclick=createSplitJobs;
+$("#scanOneBtn").onclick=fillMerged;
 $("#typeSearch").addEventListener("input", filterChips);
 $("#smallDesc").addEventListener("input",function(){ $("#notes").value=this.value; });
 $("#motResultChips").addEventListener("click",function(e){ const c=e.target.closest(".chip"); if(!c) return; setMotResult(selMot===c.dataset.mot?null:c.dataset.mot); });
