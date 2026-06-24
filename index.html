@@ -870,7 +870,7 @@ function jobCard(j){
     <div><div class="ty">${esc(typeLabel(j))}</div>
     <div class="meta">${esc(veh)||"—"}${j.reg?" · "+esc(j.reg):""}${Number(j.actualMins)>0?" · "+j.actualMins+"min":""} · ${gbp(jobTotal(j))}</div>
     <div class="meta">${esc(j.customer||"")}${open?(j.customer?" · ":"")+fmtDate(j.date):""}</div></div>
-    <div class="gph">${open?'<span style="color:var(--warn); font-size:.85rem;">open ›</span>':(gph!=null?gbp(gph)+"/h":"—")}</div></div>
+    <div class="gph">${open?'<span style="color:var(--warn); font-size:.85rem;">open ›</span>':gbp(jobGP(j))+(gph!=null?'<div class="meta" style="text-align:right; color:var(--muted); font-weight:600; margin-top:2px;">'+gbp(gph)+'/h</div>':'')}</div></div>
     ${open?'<span class="pill under">open</span>':''}
     <div class="meta" style="margin-top:9px; color:var(--accent2);">${open?"Tap to finish ›":"Tap for breakdown ›"}</div>`;
   d.onclick=()=> open ? editJob(j.id) : openBreakdown(j.id);
