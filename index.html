@@ -161,8 +161,8 @@
     <div class="sub">Fill it in when the job's done</div>
 
     <div class="card">
-      <button class="btn blue" id="scanBtn">📷 Scan an invoice</button>
-      <div class="hint-inline" style="text-align:center; margin-bottom:4px;">Photograph the invoice to auto-fill, then just add your time</div>
+      <button class="btn blue" id="scanBtn">📷 Scan an invoice or MOT sheet</button>
+      <div class="hint-inline" style="text-align:center; margin-bottom:4px;">Photograph it to auto-fill, then just add your time</div>
       <input type="file" accept="image/*" capture="environment" id="invFile" style="display:none" />
 
       <div class="divider">Or enter manually</div>
@@ -173,8 +173,27 @@
         <label>What was the job?</label>
         <textarea id="smallDesc" rows="2" placeholder="Describe the small / odd job"></textarea>
       </div>
+      <div id="motBlock" style="display:none;">
+        <label>MOT result</label>
+        <div class="chips" id="motResultChips">
+          <span class="chip" data-mot="pass">✓ Pass</span>
+          <span class="chip" data-mot="fail">✗ Fail</span>
+        </div>
+        <label>Work needed / advisories <span class="opt">(optional)</span></label>
+        <textarea id="motWork" rows="2" placeholder="What it needs, from the MOT sheet"></textarea>
+        <div class="row">
+          <div><label>MOT cost to us</label><div class="affix"><span>£</span><input id="motCostUs" type="number" inputmode="decimal" placeholder="0" /></div></div>
+          <div><label>MOT to customer</label><div class="affix"><span>£</span><input id="motCostCustomer" type="number" inputmode="decimal" placeholder="0" /></div></div>
+        </div>
+      </div>
 
-      <label>Time spent</label>
+      <label>Estimated at start <span class="opt">(your guess before you begin)</span></label>
+      <div class="row">
+        <div class="unit"><input id="estHrs" type="number" inputmode="numeric" min="0" placeholder="0" /><b>hrs</b></div>
+        <div class="unit"><input id="estMins" type="number" inputmode="numeric" min="0" max="59" placeholder="0" /><b>min</b></div>
+      </div>
+
+      <label>Actual time spent <span class="opt">(add at the end)</span></label>
       <div class="row">
         <div class="unit"><input id="hrs" type="number" inputmode="numeric" min="0" placeholder="0" /><b>hrs</b></div>
         <div class="unit"><input id="mins" type="number" inputmode="numeric" min="0" max="59" placeholder="0" /><b>min</b></div>
@@ -223,12 +242,6 @@
       <div class="slider">
         <input id="ageRange" type="range" min="1" max="40" value="10" />
         <output id="ageOut">10 yrs</output>
-      </div>
-
-      <label>Estimated at start <span class="opt">(your guess before the job)</span></label>
-      <div class="row">
-        <div class="unit"><input id="estHrs" type="number" inputmode="numeric" min="0" placeholder="0" /><b>hrs</b></div>
-        <div class="unit"><input id="estMins" type="number" inputmode="numeric" min="0" max="59" placeholder="0" /><b>min</b></div>
       </div>
 
       <div id="notesBlock">
@@ -324,8 +337,8 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 /* ---------- config ---------- */
-const JOB_TYPES = ["Small job","Service","Brakes","Clutch","Cambelt/Timing","Diagnostics","Suspension",
-  "Exhaust","Tyres","Battery/Electrical","Aircon","MOT repair","Engine","Welding"];
+const JOB_TYPES = ["Small job","Service","MOT","Brakes","Clutch","Cambelt/Timing","Diagnostics","Suspension",
+  "Exhaust","Tyres","Battery/Electrical","Aircon","Engine","Welding"];
 const MAKES_SEED = ["Audi","BMW","Citroën","Dacia","Fiat","Ford","Honda","Hyundai","Jaguar","Kia",
   "Land Rover","Lexus","Mazda","Mercedes-Benz","MG","MINI","Nissan","Peugeot","Renault","SEAT",
   "Škoda","Suzuki","Tesla","Toyota","Vauxhall","Volkswagen","Volvo"];
@@ -340,7 +353,7 @@ const SUPA_DEFAULT = { url:"https://gvyvjfldvbwdiexjyxzh.supabase.co", key:"sb_p
 let jobs = load(LS_JOBS, []);
 let customers = load(LS_CUST, []);
 let customMakes = load(LS_MAKES, []), customModels = load(LS_MODELS, []), customTypes = load(LS_TYPES, []);
-let selTypes=[], comeback=false, editingId=null, viewDate=null, selCustomerId=null, pending=null;
+let selTypes=[], comeback=false, editingId=null, viewDate=null, selCustomerId=null, pending=null, selMot=null;
 let supa = load(LS_SUPA, SUPA_DEFAULT);
 if(!supa.url || !supa.key){ supa = SUPA_DEFAULT; save(LS_SUPA, supa); }
 let sb = null;
@@ -364,8 +377,8 @@ function allJobTypes(){ return [...JOB_TYPES, ...customTypes.filter(t=>!JOB_TYPE
 
 function jobTypesOf(j){ return (j.jobTypes&&j.jobTypes.length)?j.jobTypes:(j.jobType?[j.jobType]:["Other"]); }
 function typeLabel(j){ return jobTypesOf(j).join(" + "); }
-function jobTotal(j){ return (Number(j.labourCharged)||0)+(Number(j.partsCharged)||0); }
-function jobGP(j){ return jobTotal(j)-(Number(j.partsCost)||0); }
+function jobTotal(j){ return (Number(j.labourCharged)||0)+(Number(j.partsCharged)||0)+(Number(j.motCostCustomer)||0); }
+function jobGP(j){ return jobTotal(j)-(Number(j.partsCost)||0)-(Number(j.motCostUs)||0); }
 function jobPartsProfit(j){ return (Number(j.partsCharged)||0)-(Number(j.partsCost)||0); }
 function jobGPH(j){ const h=hrs(j.actualMins); return h>0 ? jobGP(j)/h : null; }
 
@@ -381,7 +394,7 @@ function buildChips(){
   const tc=$("#jobTypeChips"); tc.innerHTML="";
   allJobTypes().forEach(t=>{
     const c=document.createElement("span"); c.className="chip"+(selTypes.includes(t)?" on":""); c.textContent=t;
-    c.onclick=()=>{ const i=selTypes.indexOf(t); if(i>=0) selTypes.splice(i,1); else selTypes.push(t); c.classList.toggle("on"); toggleSmallDesc(); };
+    c.onclick=()=>{ const i=selTypes.indexOf(t); if(i>=0) selTypes.splice(i,1); else selTypes.push(t); c.classList.toggle("on"); toggleSmallDesc(); toggleMot(); };
     tc.appendChild(c);
   });
   const other=document.createElement("span"); other.className="chip add"; other.textContent="+ Other";
@@ -400,6 +413,12 @@ function toggleSmallDesc(){
   $("#smallDescBlock").style.display=on?"block":"none";
   $("#notesBlock").style.display=on?"none":"block";
   if(on) $("#smallDesc").value=$("#notes").value;
+}
+function isMotSelected(){ return selTypes.some(t=>t.toLowerCase()==="mot"); }
+function toggleMot(){ $("#motBlock").style.display=isMotSelected()?"block":"none"; }
+function setMotResult(v){
+  selMot=v||null;
+  document.querySelectorAll("#motResultChips .chip").forEach(c=>c.classList.toggle("on", c.dataset.mot===selMot));
 }
 
 /* ---------- combobox ---------- */
@@ -455,7 +474,9 @@ function saveJob(){
     make:$("#make").value.trim(), model:$("#model").value.trim(), ageYears:+$("#ageRange").value,
     quotedHours:(num("estHrs")*60+num("estMins"))/60,
     customer:$("#customer").value.trim(), reg:$("#reg").value.trim().toUpperCase(),
-    notes:$("#notes").value.trim(), comeback:comeback };
+    notes:$("#notes").value.trim(), comeback:comeback,
+    motResult:(isMotSelected()?selMot:null), motWork:(isMotSelected()?$("#motWork").value.trim():""),
+    motCostUs:(isMotSelected()?num("motCostUs"):0), motCostCustomer:(isMotSelected()?num("motCostCustomer"):0) };
   resolveCustomerThenSave();
 }
 function resolveCustomerThenSave(){
@@ -552,6 +573,12 @@ function applyScan(d){
   if(d.work_done) $("#notes").value=d.work_done;
   if(d.labour_charged!=null && d.labour_charged!=="") $("#labourCharged").value=d.labour_charged;
   if(d.parts_charged!=null && d.parts_charged!=="") $("#partsCharged").value=d.parts_charged;
+  if(d.document_type==="mot" || d.mot_result || d.mot_work_needed){
+    if(!isMotSelected()){ selTypes.push("MOT"); buildChips(); }
+    toggleMot();
+    if(d.mot_result) setMotResult(String(d.mot_result).toLowerCase()==="fail"?"fail":"pass");
+    if(d.mot_work_needed) $("#motWork").value=d.mot_work_needed;
+  }
   window.scrollTo({top:0,behavior:"smooth"});
 }
 function editJob(id){
@@ -567,7 +594,9 @@ function editJob(id){
   $("#ageRange").value=j.ageYears||10; updateAge();
   const qm=Math.round((j.quotedHours||0)*60); $("#estHrs").value=Math.floor(qm/60)||""; $("#estMins").value=qm%60||"";
   $("#notes").value=j.notes||"";
-  toggleSmallDesc();
+  $("#motWork").value=j.motWork||""; $("#motCostUs").value=j.motCostUs||""; $("#motCostCustomer").value=j.motCostCustomer||"";
+  setMotResult(j.motResult||null);
+  toggleSmallDesc(); toggleMot();
   renderCustomerCars();
   $("#saveBtn").textContent="Update job"; $("#cancelBtn").style.display="flex"; $("#deleteBtn").style.display="flex";
   showView("log");
@@ -582,12 +611,12 @@ function deleteJob(){
   });
 }
 function clearForm(){
-  selTypes=[]; comeback=false; editingId=null; selCustomerId=null; pending=null;
-  ["hrs","mins","labourCharged","partsCharged","partsCost","make","model","estHrs","estMins","customer","phone","reg","notes","smallDesc"].forEach(id=>$("#"+id).value="");
-  $("#customerCars").innerHTML="";
+  selTypes=[]; comeback=false; editingId=null; selCustomerId=null; pending=null; selMot=null;
+  ["hrs","mins","labourCharged","partsCharged","partsCost","make","model","estHrs","estMins","customer","phone","reg","notes","smallDesc","motWork","motCostUs","motCostCustomer"].forEach(id=>$("#"+id).value="");
+  $("#customerCars").innerHTML=""; setMotResult(null);
   $("#jobDate").value=today();
   $("#ageRange").value=10; updateAge(); $("#comebackChip").classList.remove("on");
-  buildChips(); toggleSmallDesc();
+  buildChips(); toggleSmallDesc(); toggleMot();
   $("#saveBtn").textContent="Save job"; $("#cancelBtn").style.display="none"; $("#deleteBtn").style.display="none";
   window.scrollTo({top:0,behavior:"smooth"});
 }
@@ -689,7 +718,7 @@ function renderStats(){
 /* ---------- export ---------- */
 function exportCSV(){
   if(!jobs.length){ toast("No jobs to export"); return; }
-  const cols=["date","jobType","customer","phone","reg","make","model","ageYears","actualMins","quotedHours","labourCharged","partsCharged","partsCost","totalCharged","grossProfit","comeback","notes","customer_id","createdAt"];
+  const cols=["date","jobType","customer","phone","reg","make","model","ageYears","actualMins","quotedHours","labourCharged","partsCharged","partsCost","motResult","motWork","motCostUs","motCostCustomer","totalCharged","grossProfit","comeback","notes","customer_id","createdAt"];
   const escc=v=>{ v=(v==null?"":String(v)); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
   const rowOut=j=>{ const c=getCustomer(j.customerId); return { ...j, jobType:typeLabel(j), phone:c?c.phone:"", totalCharged:jobTotal(j), grossProfit:jobGP(j), customer_id:j.customerId }; };
   const csv=cols.join(",")+"\n"+jobs.map(j=>{ const r=rowOut(j); return cols.map(c=>escc(r[c])).join(","); }).join("\n");
@@ -730,6 +759,7 @@ async function loadOptions(){
 function rowFor(j){ return { id:j.id, created_at:j.createdAt, job_date:j.date, job_type:typeLabel(j), make:j.make,
   model:j.model, reg:j.reg, customer_id:j.customerId, age_years:j.ageYears, actual_mins:j.actualMins, quoted_hours:j.quotedHours,
   labour_charged:j.labourCharged, parts_charged:j.partsCharged, parts_cost:j.partsCost,
+  mot_result:j.motResult||null, mot_work:j.motWork||"", mot_cost_us:j.motCostUs||0, mot_cost_customer:j.motCostCustomer||0,
   total_charged:jobTotal(j), customer:j.customer, notes:j.notes, comeback:j.comeback }; }
 async function pushOne(j){ if(!sb) return; try{ const {error}=await sb.from("jobs").upsert(rowFor(j)); if(!error){ j.synced=true; save(LS_JOBS,jobs); } }catch(e){} }
 function custRow(c){ return { id:c.id, name:c.name, phone:c.phone||"", cars:c.cars||[],
@@ -754,6 +784,7 @@ $("#customer").addEventListener("input", ()=>{ const c=getCustomer(selCustomerId
 $("#reg").addEventListener("input", function(){ const p=this.selectionStart; this.value=this.value.toUpperCase(); this.setSelectionRange&&this.setSelectionRange(p,p); });
 $("#ageRange").addEventListener("input", updateAge);
 $("#smallDesc").addEventListener("input",function(){ $("#notes").value=this.value; });
+$("#motResultChips").addEventListener("click",function(e){ const c=e.target.closest(".chip"); if(!c) return; setMotResult(selMot===c.dataset.mot?null:c.dataset.mot); });
 $("#scanBtn").onclick=()=>$("#invFile").click();
 $("#invFile").onchange=function(){ if(this.files&&this.files[0]) scanInvoice(this.files[0]); this.value=""; };
 $("#saveBtn").onclick=saveJob;

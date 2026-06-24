@@ -11,12 +11,14 @@ export default async function handler(req, res) {
     const mediaType = (body && body.media_type) || "image/jpeg";
     if (!image) { res.status(400).json({ error: "No image provided" }); return; }
 
-    const prompt = `You are reading a UK car garage / mechanic invoice or job sheet. ` +
-      `Extract the fields and respond with ONLY a JSON object (no prose, no markdown fences) with exactly these keys:\n` +
-      `{"customer_name": string|null, "registration": string|null, "make": string|null, "model": string|null, ` +
-      `"date": string|null, "work_done": string|null, "labour_charged": number|null, "parts_charged": number|null, "total": number|null}\n` +
+    const prompt = `You are reading a UK car garage document: either a mechanic's invoice/job sheet OR an MOT test certificate/failure sheet. ` +
+      `Figure out which it is and extract the fields. Respond with ONLY a JSON object (no prose, no markdown fences) with exactly these keys:\n` +
+      `{"document_type": "invoice"|"mot"|null, "customer_name": string|null, "registration": string|null, "make": string|null, "model": string|null, ` +
+      `"date": string|null, "work_done": string|null, "labour_charged": number|null, "parts_charged": number|null, "total": number|null, ` +
+      `"mot_result": "pass"|"fail"|null, "mot_work_needed": string|null}\n` +
       `Rules: date as ISO yyyy-mm-dd if you can determine it. labour_charged = the labour/service amount in GBP excluding VAT. ` +
       `parts_charged = total parts charged to the customer in GBP excluding VAT. total = final total including VAT. ` +
+      `For an MOT sheet: set document_type "mot", mot_result to pass or fail, and mot_work_needed to a concise list of the failure items and advisories. ` +
       `Numbers must be plain numbers with no currency symbol or commas. Use null for anything not clearly present.`;
 
     const r = await fetch("https://api.anthropic.com/v1/messages", {
