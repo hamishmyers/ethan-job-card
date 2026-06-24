@@ -248,6 +248,7 @@
       </div>
 
       <button class="btn green" id="saveBtn" style="margin-top:20px;">Save job</button>
+      <button class="btn grey" id="addAnotherBtn">Save &amp; add another job</button>
       <button class="btn blue" id="completeBtn">Mark complete ✓</button>
       <button class="btn grey" id="cancelBtn" style="display:none;">Cancel edit</button>
       <button class="btn red" id="deleteBtn" style="display:none;">Delete this job</button>
@@ -450,7 +451,7 @@ let editingPurchaseId = null;
 let customMakes = load(LS_MAKES, []), customTypes = load(LS_TYPES, []);
 let customModelsByMake = load(LS_MODELS, {}); if(Array.isArray(customModelsByMake)) customModelsByMake={};
 let selTypes=[], comeback=false, editingId=null, viewDate=null, selCustomerId=null, pending=null, selMot=null, jobFilter="all";
-let usage=load("joblog.usage.v1",{}), bdJobId=null;
+let usage=load("joblog.usage.v1",{}), bdJobId=null, pendingAddAnother=false;
 let supa = load(LS_SUPA, SUPA_DEFAULT);
 if(!supa.url || !supa.key){ supa = SUPA_DEFAULT; save(LS_SUPA, supa); }
 let sb = null;
@@ -620,8 +621,9 @@ function onPickCustomer(name){ const m=customersByName(name);
   if(m.length===1){ selCustomerId=m[0].id; $("#phone").value=m[0].phone||""; renderCustomerCars(); } else { selCustomerId=null; $("#customerCars").innerHTML=""; } }
 
 /* ---------- save / edit / delete ---------- */
-function saveJob(markComplete){
+function saveJob(markComplete, addAnother){
   if(!selTypes.length){ toast("Pick at least one job type"); return; }
+  pendingAddAnother=!!addAnother;
   const mins = num("hrs")*60 + num("mins");
   persistCustom();
   let closed;
@@ -659,9 +661,20 @@ function commitSave(customerId, createNew){
   const wasEditing=editingId;
   const open=jobOpen(pending);
   if(editingId){ const j=jobs.find(x=>x.id===editingId); if(j){ Object.assign(j,pending); j.synced=false; if(sb)pushOne(j); } toast(open?"Saved — still open":"Updated ✓"); }
-  else{ const j={ id:uid(), createdAt:new Date().toISOString(), ...pending, synced:false }; jobs.unshift(j); if(sb)pushOne(j); toast(open?"Saved — open":"Saved & completed ✓"); }
-  save(LS_JOBS,jobs); closeDupModal(); clearForm(); renderJobs(); renderStats();
+  else{ const j={ id:uid(), createdAt:new Date().toISOString(), ...pending, synced:false }; jobs.unshift(j); if(sb)pushOne(j);
+    toast(pendingAddAnother?"Saved — add the next job":(open?"Saved — open":"Saved & completed ✓")); }
+  save(LS_JOBS,jobs); closeDupModal(); renderJobs(); renderStats();
+  if(pendingAddAnother && !wasEditing){ partialClear(customerId); pendingAddAnother=false; return; }
+  pendingAddAnother=false; clearForm();
   if(wasEditing) showView("jobs");
+}
+function partialClear(custId){
+  selTypes=[]; selMot=null; editingId=null; pending=null;
+  ["hrs","mins","labourCharged","partsCharged","partsCost","notes","smallDesc","motWork","motCostUs","motCostCustomer"].forEach(id=>$("#"+id).value="");
+  setMotResult(null); swReset(); buildChips(); toggleSmallDesc(); toggleMot();
+  selCustomerId=custId||selCustomerId; renderCustomerCars();
+  $("#saveBtn").textContent="Save job"; const cb=$("#completeBtn"); cb.textContent="Mark complete ✓"; cb.className="btn blue"; cb._reopen=false;
+  window.scrollTo({top:0,behavior:"smooth"});
 }
 function openDupModal(name, matches){
   $("#dupTitle").textContent='“'+name+'” already exists';
@@ -670,7 +683,7 @@ function openDupModal(name, matches){
   matches.forEach(c=>{
     const carsTxt=(c.cars&&c.cars.length)? c.cars.map(car=>(car.reg||"no reg")+(car.make?" "+car.make+(car.model?" "+car.model:""):"")).join(", ") : "no cars on record";
     const d=document.createElement("div"); d.className="cust-opt";
-    d.innerHTML=`<div style="font-weight:700;">${esc(c.name)}</div><div class="cars">${esc(carsTxt)}</div>`;
+    d.innerHTML=`<div style="font-weight:700;">${esc(c.name)} <span class="muted" style="font-size:.78rem; font-weight:600;">#${esc(String(c.id).slice(-4))}</span></div><div class="cars">${esc(carsTxt)}</div>`;
     const b=document.createElement("button"); b.className="btn blue"; b.textContent="Same customer (add this car if new)";
     b.onclick=()=>commitSave(c.id); d.appendChild(b); box.appendChild(d);
   });
@@ -823,6 +836,7 @@ function editJob(id){
   toggleSmallDesc(); toggleMot();
   renderCustomerCars();
   $("#saveBtn").textContent="Update job"; $("#cancelBtn").style.display="flex"; $("#deleteBtn").style.display="flex";
+  $("#addAnotherBtn").style.display="none";
   setCompleteBtn();
   showView("log");
 }
@@ -853,6 +867,7 @@ function clearForm(){
   $("#jobDate").value=today();
   buildChips(); toggleSmallDesc(); toggleMot();
   $("#saveBtn").textContent="Save job"; $("#cancelBtn").style.display="none"; $("#deleteBtn").style.display="none";
+  $("#addAnotherBtn").style.display="flex";
   const cb=$("#completeBtn"); cb.textContent="Mark complete ✓"; cb.className="btn blue"; cb._reopen=false;
   swReset();
   window.scrollTo({top:0,behavior:"smooth"});
@@ -870,7 +885,7 @@ function jobCard(j){
     <div><div class="ty">${esc(typeLabel(j))}</div>
     <div class="meta">${esc(veh)||"—"}${j.reg?" · "+esc(j.reg):""}${Number(j.actualMins)>0?" · "+j.actualMins+"min":""} · ${gbp(jobTotal(j))}</div>
     <div class="meta">${esc(j.customer||"")}${open?(j.customer?" · ":"")+fmtDate(j.date):""}</div></div>
-    <div class="gph">${open?'<span style="color:var(--warn); font-size:.85rem;">open ›</span>':gbp(jobGP(j))+(gph!=null?'<div class="meta" style="text-align:right; color:var(--muted); font-weight:600; margin-top:2px;">'+gbp(gph)+'/h</div>':'')}</div></div>
+    <div class="gph">${open?'<span style="color:var(--warn); font-size:.85rem;">open ›</span>':'<div class="meta" style="text-align:right; color:var(--muted); font-weight:600;">profit</div>'+gbp(jobGP(j))+(gph!=null?'<div class="meta" style="text-align:right; color:var(--muted); font-weight:600; margin-top:2px;">'+gbp(gph)+'/h</div>':'')}</div></div>
     ${open?'<span class="pill under">open</span>':''}
     <div class="meta" style="margin-top:9px; color:var(--accent2);">${open?"Tap to finish ›":"Tap for breakdown ›"}</div>`;
   d.onclick=()=> open ? editJob(j.id) : openBreakdown(j.id);
@@ -1142,6 +1157,7 @@ $("#bdEditBtn").onclick=function(){ closeBreakdown(); if(bdJobId) editJob(bdJobI
 $("#bdCloseBtn").onclick=closeBreakdown;
 $("#swToggle").onclick=swToggle;
 $("#swReset").onclick=swReset;
+$("#addAnotherBtn").onclick=()=>saveJob(false,true);
 $("#scanSplitBtn").onclick=createSplitJobs;
 $("#scanOneBtn").onclick=fillMerged;
 $("#typeSearch").addEventListener("input", filterChips);
