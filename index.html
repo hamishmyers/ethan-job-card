@@ -999,6 +999,7 @@ function showView(v){
   ["log","jobs","parts","stats","settings"].forEach(n=>$("#view-"+n).style.display=(n===v?"block":"none"));
   document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b.dataset.view===v));
   if(v==="jobs") renderJobs(); if(v==="stats") renderStats(); if(v==="parts") renderPurchases();
+  if(["log","jobs","parts","stats"].includes(v)) save("joblog.view.v1", v);
   window.scrollTo(0,0);
 }
 
@@ -1044,6 +1045,7 @@ $("#jobDate").value=today();
 window.addEventListener("load", initSupa);
 document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") pullAll(); });
 renderJobs(); renderStats();
+showView(load("joblog.view.v1","log"));
 </script>
 </body>
 </html>
