@@ -373,7 +373,11 @@ function uniqSort(a){ return [...new Set(a)].sort((x,y)=>x.localeCompare(y)); }
 function normReg(r){ return (r||"").toUpperCase().replace(/\s+/g,""); }
 function allMakes(){ return uniqSort([...MAKES_SEED,...customMakes]); }
 function allModels(){ return uniqSort([...MODELS_SEED,...customModels]); }
-function allJobTypes(){ return [...JOB_TYPES, ...customTypes.filter(t=>!JOB_TYPES.includes(t))]; }
+function allJobTypes(){
+  const out=[...JOB_TYPES]; const lower=out.map(x=>x.toLowerCase());
+  customTypes.forEach(t=>{ const l=(t||"").toLowerCase(); if(t && !lower.includes(l)){ out.push(t); lower.push(l); } });
+  return out;
+}
 
 function jobTypesOf(j){ return (j.jobTypes&&j.jobTypes.length)?j.jobTypes:(j.jobType?[j.jobType]:["Other"]); }
 function typeLabel(j){ return jobTypesOf(j).join(" + "); }
@@ -775,6 +779,7 @@ function showView(v){
 }
 
 /* ---------- wire ---------- */
+customTypes=customTypes.filter(t=>!JOB_TYPES.some(s=>s.toLowerCase()===(t||"").toLowerCase())); save(LS_TYPES,customTypes);
 buildChips(); updateAge();
 attachCombo($("#make"), $("#makeList"), allMakes, null, "make");
 attachCombo($("#model"), $("#modelList"), allModels, null, "model");
