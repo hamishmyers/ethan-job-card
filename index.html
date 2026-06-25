@@ -467,46 +467,62 @@ function populateTypeOptions(){ const dl=$("#typeOptions"); if(!dl) return; dl.i
 let blocks=[], blockSeq=0;
 function blockHTML(bid){ return `
   <div class="card" id="blk-${bid}" style="background:var(--card2);">
-    <div style="display:flex; justify-content:space-between; align-items:center;">
-      <div style="font-weight:800;">Job <span class="blkNum"></span></div>
-      <button class="chip blkRemove" data-id="${bid}" style="min-height:38px;">Remove</button>
-    </div>
-    <label>Job type</label>
-    <div class="chips">${QUICK_TYPES.map(t=>`<span class="chip blkQuick" data-id="${bid}">${t}</span>`).join("")}</div>
-    <input class="blkType" data-id="${bid}" list="typeOptions" placeholder="Type or tap above" autocomplete="off" style="margin-top:8px;" />
-    <label>Time spent</label>
-    <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
-      <button class="btn grey blkSw" data-id="${bid}" style="width:auto; min-height:46px; padding:10px 18px; margin:0;">▶ Start</button>
-      <span class="blkSwDisp" data-id="${bid}" style="font-weight:800; font-size:1.2rem; font-variant-numeric:tabular-nums;">00:00</span>
-    </div>
-    <div class="row">
-      <div class="unit"><input class="blkHrs" data-id="${bid}" type="number" inputmode="numeric" min="0" placeholder="0" /><b>hrs</b></div>
-      <div class="unit"><input class="blkMins" data-id="${bid}" type="number" inputmode="numeric" min="0" max="59" placeholder="0" /><b>min</b></div>
-    </div>
-    <label>Labour charged</label>
-    <div class="affix"><span>£</span><input class="blkLabour" data-id="${bid}" type="number" inputmode="decimal" placeholder="0" /></div>
-    <label>Parts charged <span class="opt">(to customer)</span></label>
-    <div class="affix"><span>£</span><input class="blkPC" data-id="${bid}" type="number" inputmode="decimal" placeholder="0" /></div>
-    <label>Parts cost <span class="opt">(what you paid)</span></label>
-    <div class="affix"><span>£</span><input class="blkPK" data-id="${bid}" type="number" inputmode="decimal" placeholder="0" /></div>
-    <div class="blkMot" data-id="${bid}" style="display:none;">
-      <label>MOT result</label>
-      <div class="chips blkMotRes" data-id="${bid}"><span class="chip" data-mot="pass">✓ Pass</span><span class="chip" data-mot="fail">✗ Fail</span></div>
-      <label>MOT work / advisories <span class="opt">(optional)</span></label>
-      <textarea class="blkMotWork" data-id="${bid}" rows="2" placeholder="From the MOT sheet"></textarea>
-      <div class="row">
-        <div><label>MOT cost to us</label><div class="affix"><span>£</span><input class="blkMotUs" data-id="${bid}" type="number" inputmode="decimal" placeholder="0" /></div></div>
-        <div><label>MOT to customer</label><div class="affix"><span>£</span><input class="blkMotCust" data-id="${bid}" type="number" inputmode="decimal" placeholder="0" /></div></div>
+    <div class="blkHead" data-id="${bid}" style="display:flex; justify-content:space-between; align-items:center; gap:10px; cursor:pointer;">
+      <div style="min-width:0;"><div style="font-weight:800;">Job <span class="blkNum"></span></div><div class="blkSummary meta" style="display:none;"></div></div>
+      <div style="display:flex; gap:8px; align-items:center; flex:0 0 auto;">
+        <button class="chip blkRemove" data-id="${bid}" style="min-height:36px;">Remove</button>
+        <span class="blkChevron" style="font-size:1.1rem; color:var(--muted);">▾</span>
       </div>
     </div>
-    <label>Notes <span class="opt">(optional)</span></label>
-    <textarea class="blkNotes" data-id="${bid}" rows="2" placeholder="Any more useful context?"></textarea>
+    <div class="blkBody">
+      <label>Job type</label>
+      <div class="chips">${QUICK_TYPES.map(t=>`<span class="chip blkQuick" data-id="${bid}">${t}</span>`).join("")}</div>
+      <input class="blkType" data-id="${bid}" list="typeOptions" placeholder="Type or tap above" autocomplete="off" style="margin-top:8px;" />
+      <label>Time spent</label>
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
+        <button class="btn grey blkSw" data-id="${bid}" style="width:auto; min-height:46px; padding:10px 18px; margin:0;">▶ Start</button>
+        <span class="blkSwDisp" data-id="${bid}" style="font-weight:800; font-size:1.2rem; font-variant-numeric:tabular-nums;">00:00</span>
+      </div>
+      <div class="row">
+        <div class="unit"><input class="blkHrs" data-id="${bid}" type="number" inputmode="numeric" min="0" placeholder="0" /><b>hrs</b></div>
+        <div class="unit"><input class="blkMins" data-id="${bid}" type="number" inputmode="numeric" min="0" max="59" placeholder="0" /><b>min</b></div>
+      </div>
+      <label>Labour charged</label>
+      <div class="affix"><span>£</span><input class="blkLabour" data-id="${bid}" type="number" inputmode="decimal" placeholder="0" /></div>
+      <label>Parts charged <span class="opt">(to customer)</span></label>
+      <div class="affix"><span>£</span><input class="blkPC" data-id="${bid}" type="number" inputmode="decimal" placeholder="0" /></div>
+      <label>Parts cost <span class="opt">(what you paid)</span></label>
+      <div class="affix"><span>£</span><input class="blkPK" data-id="${bid}" type="number" inputmode="decimal" placeholder="0" /></div>
+      <div class="blkMot" data-id="${bid}" style="display:none;">
+        <label>MOT result</label>
+        <div class="chips blkMotRes" data-id="${bid}"><span class="chip" data-mot="pass">✓ Pass</span><span class="chip" data-mot="fail">✗ Fail</span></div>
+        <label>MOT work / advisories <span class="opt">(optional)</span></label>
+        <textarea class="blkMotWork" data-id="${bid}" rows="2" placeholder="From the MOT sheet"></textarea>
+        <div class="row">
+          <div><label>MOT cost to us</label><div class="affix"><span>£</span><input class="blkMotUs" data-id="${bid}" type="number" inputmode="decimal" placeholder="0" /></div></div>
+          <div><label>MOT to customer</label><div class="affix"><span>£</span><input class="blkMotCust" data-id="${bid}" type="number" inputmode="decimal" placeholder="0" /></div></div>
+        </div>
+      </div>
+      <label>Notes <span class="opt">(optional)</span></label>
+      <textarea class="blkNotes" data-id="${bid}" rows="2" placeholder="Any more useful context?"></textarea>
+    </div>
   </div>`;
 }
+function blkSummaryText(bid){ const el=$("#blk-"+bid); if(!el) return "";
+  const type=el.querySelector(".blkType").value.trim()||"No type yet";
+  const mins=(Number(el.querySelector(".blkHrs").value)||0)*60+(Number(el.querySelector(".blkMins").value)||0);
+  const charged=(Number(el.querySelector(".blkLabour").value)||0)+(Number(el.querySelector(".blkPC").value)||0)+(Number(el.querySelector(".blkMotCust").value)||0);
+  const parts=[type]; if(mins) parts.push(mins+"min"); parts.push(gbp(charged)+" charged");
+  return parts.join(" · "); }
+function setBlkCollapsed(bid, collapsed){ const b=blkState(bid), el=$("#blk-"+bid); if(!b||!el) return; b.collapsed=collapsed;
+  el.querySelector(".blkBody").style.display=collapsed?"none":"block";
+  const sum=el.querySelector(".blkSummary"); sum.textContent=blkSummaryText(bid); sum.style.display=collapsed?"block":"none";
+  el.querySelector(".blkChevron").textContent=collapsed?"▸":"▾"; }
+function collapseAllBlocks(){ blocks.forEach(b=>setBlkCollapsed(b.id,true)); }
 function blkState(bid){ return blocks.find(b=>b.id===bid); }
 function addBlock(prefill){
   const bid=++blockSeq;
-  blocks.push({id:bid, motResult:(prefill&&prefill.motResult)||null, accum:0, running:false, start:0, tick:null});
+  blocks.push({id:bid, motResult:(prefill&&prefill.motResult)||null, accum:0, running:false, start:0, tick:null, collapsed:false});
   $("#jobBlocks").insertAdjacentHTML("beforeend", blockHTML(bid));
   const el=$("#blk-"+bid);
   if(prefill){
@@ -1074,12 +1090,13 @@ $("#jobFilter").addEventListener("click",function(e){ const c=e.target.closest("
   [...this.children].forEach(x=>x.classList.toggle("on",x===c)); viewDate=null; renderJobs(); });
 $("#bdEditBtn").onclick=function(){ closeBreakdown(); if(bdJobId) editJob(bdJobId); };
 $("#bdCloseBtn").onclick=closeBreakdown;
-$("#addAnotherBtn").onclick=()=>{ addBlock(); window.scrollTo({top:document.body.scrollHeight,behavior:"smooth"}); };
+$("#addAnotherBtn").onclick=()=>{ collapseAllBlocks(); addBlock(); window.scrollTo({top:document.body.scrollHeight,behavior:"smooth"}); };
 $("#jobBlocks").addEventListener("click",e=>{
-  const q=e.target.closest(".blkQuick"); if(q){ const el=$("#blk-"+q.dataset.id); el.querySelector(".blkType").value=q.textContent; updateBlkMot(+q.dataset.id); return; }
   const rm=e.target.closest(".blkRemove"); if(rm){ removeBlock(+rm.dataset.id); return; }
+  const q=e.target.closest(".blkQuick"); if(q){ const el=$("#blk-"+q.dataset.id); el.querySelector(".blkType").value=q.textContent; updateBlkMot(+q.dataset.id); return; }
   const sw=e.target.closest(".blkSw"); if(sw){ blkSwToggle(+sw.dataset.id); return; }
   const mr=e.target.closest(".blkMotRes .chip"); if(mr){ const bid=+mr.closest(".blkMotRes").dataset.id; const b=blkState(bid); if(b){ b.motResult=(b.motResult===mr.dataset.mot?null:mr.dataset.mot); renderBlkMotRes(bid); } return; }
+  const head=e.target.closest(".blkHead"); if(head){ const bid=+head.dataset.id; const b=blkState(bid); if(b) setBlkCollapsed(bid,!b.collapsed); return; }
 });
 $("#jobBlocks").addEventListener("input",e=>{ const t=e.target.closest(".blkType"); if(t) updateBlkMot(+t.dataset.id); });
 $("#scanBtn").onclick=()=>$("#invFile").click();
