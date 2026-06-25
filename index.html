@@ -634,10 +634,15 @@ function renderCustomerCars(){
   box.appendChild(nc);
 }
 function carByReg(reg){ const n=normReg(reg); if(!n) return null; for(const c of customers){ for(const car of (c.cars||[])){ if(normReg(car.reg)===n) return {customer:c, car}; } } return null; }
-function autofillFromReg(){ const hit=carByReg($("#reg").value); if(!hit) return;
-  if(!$("#customer").value.trim()){ $("#customer").value=hit.customer.name; selCustomerId=hit.customer.id; $("#phone").value=hit.customer.phone||""; renderCustomerCars(); }
-  if(!$("#make").value.trim() && hit.car.make) $("#make").value=hit.car.make;
-  if(!$("#model").value.trim() && hit.car.model) $("#model").value=hit.car.model;
+function linkToCustomer(c, car){ $("#customer").value=c.name; selCustomerId=c.id; $("#phone").value=c.phone||"";
+  if(car){ if(!$("#make").value.trim() && car.make) $("#make").value=car.make; if(!$("#model").value.trim() && car.model) $("#model").value=car.model; }
+  renderCustomerCars(); }
+function confirmRegMatch(){
+  const hit=carByReg($("#reg").value); if(!hit) return;
+  if(selCustomerId===hit.customer.id) return;
+  showConfirm("Reg already on file", $("#reg").value.trim().toUpperCase()+" is registered to "+hit.customer.name+". Is this them?",
+    ()=>{ linkToCustomer(hit.customer, hit.car); toast("Linked to "+hit.customer.name); },
+    "Yes, use them", "btn blue");
 }
 function onPickCustomer(name){ const m=customersByName(name);
   if(m.length===1){ selCustomerId=m[0].id; $("#phone").value=m[0].phone||""; renderCustomerCars(); } else { selCustomerId=null; $("#customerCars").innerHTML=""; } }
@@ -658,13 +663,23 @@ async function saveLog(markComplete){
   if(pendingPhotoB64){ const u=await uploadPhoto(pendingPhotoB64,"invoices"); if(u) pendingLog.shared.photoUrl=u; }
   resolveCustomerThenSaveLog();
 }
-function resolveCustomerThenSaveLog(){
+function resolveByName(){
   const name=pendingLog.shared.customer;
   if(!name){ commitLog(null); return; }
   if(selCustomerId && getCustomer(selCustomerId)){ commitLog(selCustomerId); return; }
   const matches=customersByName(name);
   if(!matches.length){ commitLog(null,true); return; }
   openDupModal(name, matches);
+}
+function resolveCustomerThenSaveLog(){
+  const s=pendingLog.shared;
+  const hit=carByReg(s.reg);
+  if(hit && selCustomerId!==hit.customer.id){
+    showConfirm("Reg already on file", s.reg+" is already registered to "+hit.customer.name+". Save this under "+hit.customer.name+" (avoids a duplicate)?",
+      ()=>commitLog(hit.customer.id), "Use "+hit.customer.name, "btn blue", resolveByName);
+    return;
+  }
+  resolveByName();
 }
 function commitLog(customerId, createNew){
   const s=pendingLog.shared; const car={reg:s.reg,make:s.make,model:s.model};
@@ -714,12 +729,12 @@ function showPrompt(title, ph, cb){
   askCb=(ok)=>{ const v=i.value.trim(); closeAsk(); if(ok&&v&&cb) cb(v); };
   $("#askModal").classList.add("open"); setTimeout(()=>i.focus(),60);
 }
-function showConfirm(title, msg, cb){
+function showConfirm(title, msg, cb, okLabel, okClass, onNo){
   $("#askTitle").textContent=title; const s=$("#askSub");
   if(msg){ s.textContent=msg; s.style.display="block"; } else s.style.display="none";
   $("#askInput").style.display="none";
-  $("#askOk").textContent="Delete"; $("#askOk").className="btn red";
-  askCb=(ok)=>{ closeAsk(); if(ok&&cb) cb(); };
+  $("#askOk").textContent=okLabel||"Delete"; $("#askOk").className=okClass||"btn red";
+  askCb=(ok)=>{ closeAsk(); if(ok){ if(cb) cb(); } else { if(onNo) onNo(); } };
   $("#askModal").classList.add("open");
 }
 function closeAsk(){ $("#askModal").classList.remove("open"); askCb=null; }
@@ -1126,8 +1141,7 @@ attachCombo($("#customer"), $("#customerList"), ()=>uniqSort(customers.map(c=>c.
 $("#customer").addEventListener("input", ()=>{ const c=getCustomer(selCustomerId);
   if(!c || c.name.toLowerCase()!==$("#customer").value.trim().toLowerCase()){ selCustomerId=null; $("#customerCars").innerHTML=""; } });
 $("#reg").addEventListener("input", function(){ const p=this.selectionStart; this.value=this.value.toUpperCase(); this.setSelectionRange&&this.setSelectionRange(p,p); showRegAge(); });
-$("#reg").addEventListener("change", autofillFromReg);
-$("#reg").addEventListener("blur", autofillFromReg);
+$("#reg").addEventListener("change", confirmRegMatch);
 $("#completeBtn").onclick=function(){ if(this._reopen) reopenJob(); else saveLog(true); };
 $("#jobFilter").addEventListener("click",function(e){ const c=e.target.closest(".chip"); if(!c) return; jobFilter=c.dataset.f;
   [...this.children].forEach(x=>x.classList.toggle("on",x===c)); viewDate=null; renderJobs(); });
