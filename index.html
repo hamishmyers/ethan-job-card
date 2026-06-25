@@ -196,6 +196,9 @@
         <div class="combo-list" id="modelList"></div>
       </div>
 
+      <label>Mileage <span class="opt">(odometer reading)</span></label>
+      <input id="mileage" type="number" inputmode="numeric" placeholder="e.g. 53318" />
+
       <label>Date <span class="opt">(defaults to today)</span></label>
       <input id="jobDate" type="date" />
 
@@ -621,6 +624,12 @@ function renderCustomerCars(){
     [...box.children].forEach(x=>x.classList.remove("on")); nc.classList.add("on"); };
   box.appendChild(nc);
 }
+function carByReg(reg){ const n=normReg(reg); if(!n) return null; for(const c of customers){ for(const car of (c.cars||[])){ if(normReg(car.reg)===n) return {customer:c, car}; } } return null; }
+function autofillFromReg(){ const hit=carByReg($("#reg").value); if(!hit) return;
+  if(!$("#customer").value.trim()){ $("#customer").value=hit.customer.name; selCustomerId=hit.customer.id; $("#phone").value=hit.customer.phone||""; renderCustomerCars(); }
+  if(!$("#make").value.trim() && hit.car.make) $("#make").value=hit.car.make;
+  if(!$("#model").value.trim() && hit.car.model) $("#model").value=hit.car.model;
+}
 function onPickCustomer(name){ const m=customersByName(name);
   if(m.length===1){ selCustomerId=m[0].id; $("#phone").value=m[0].phone||""; renderCustomerCars(); } else { selCustomerId=null; $("#customerCars").innerHTML=""; } }
 
@@ -635,7 +644,7 @@ function saveLog(markComplete){
     const k=b.type.toLowerCase(); usage[k]=(usage[k]||0)+1; });
   save("joblog.usage.v1",usage); populateTypeOptions();
   pendingLog={ shared:{ date:$("#jobDate").value||today(), customer:$("#customer").value.trim(), phone:$("#phone").value.trim(),
-      reg:$("#reg").value.trim().toUpperCase(), make:$("#make").value.trim(), model:$("#model").value.trim() },
+      reg:$("#reg").value.trim().toUpperCase(), make:$("#make").value.trim(), model:$("#model").value.trim(), mileage:Number($("#mileage").value)||null },
     list, markComplete:!!markComplete };
   resolveCustomerThenSaveLog();
 }
@@ -657,14 +666,14 @@ function commitLog(customerId, createNew){
   const closed=!!pendingLog.markComplete, age=ukPlateAge(s.reg);
   if(editingId){
     const j=jobs.find(x=>x.id===editingId), b=pendingLog.list[0];
-    if(j){ Object.assign(j,{ date:s.date, customer:s.customer, reg:s.reg, make:s.make, model:s.model, customerId:customerId||"", ageYears:age,
+    if(j){ Object.assign(j,{ date:s.date, customer:s.customer, reg:s.reg, make:s.make, model:s.model, mileage:s.mileage, customerId:customerId||"", ageYears:age,
       jobTypes:[b.type], jobType:b.type, actualMins:b.mins, labourCharged:b.labour, partsCharged:b.partsCharged, partsCost:b.partsCost,
       notes:b.notes, motResult:b.motResult, motWork:b.motWork, motCostUs:b.motCostUs, motCostCustomer:b.motCostCustomer, closed }); j.synced=false; if(sb)pushOne(j); }
     toast("Updated ✓");
   } else {
     pendingLog.list.forEach(b=>{ const j={ id:uid(), createdAt:new Date().toISOString(), date:s.date,
       jobTypes:[b.type], jobType:b.type, actualMins:b.mins, labourCharged:b.labour, partsCharged:b.partsCharged, partsCost:b.partsCost,
-      make:s.make, model:s.model, ageYears:age, customer:s.customer, reg:s.reg, customerId:customerId||"",
+      make:s.make, model:s.model, mileage:s.mileage, ageYears:age, customer:s.customer, reg:s.reg, customerId:customerId||"",
       notes:b.notes, comeback:false, motResult:b.motResult, motWork:b.motWork, motCostUs:b.motCostUs, motCostCustomer:b.motCostCustomer, closed, synced:false };
       jobs.unshift(j); if(sb)pushOne(j); });
     toast(closed?"Saved & completed ✓":"Saved — "+pendingLog.list.length+" job"+(pendingLog.list.length>1?"s":""));
@@ -741,6 +750,7 @@ function fillShared(d){
   if(d.registration){ $("#reg").value=String(d.registration).toUpperCase(); showRegAge(); }
   if(d.make) $("#make").value=d.make;
   if(d.model) $("#model").value=d.model;
+  if(d.odometer!=null && d.odometer!=="") $("#mileage").value=d.odometer;
   if(d.date && /^\d{4}-\d{2}-\d{2}$/.test(d.date)) $("#jobDate").value=d.date;
 }
 function applyScan(d){
@@ -767,7 +777,7 @@ function editJob(id){
   $("#jobDate").value=j.date;
   $("#customer").value=j.customer||""; $("#reg").value=j.reg||"";
   const lc=getCustomer(j.customerId); $("#phone").value=(lc&&lc.phone)?lc.phone:"";
-  $("#make").value=j.make||""; $("#model").value=j.model||""; showRegAge();
+  $("#make").value=j.make||""; $("#model").value=j.model||""; $("#mileage").value=j.mileage||""; showRegAge();
   renderCustomerCars();
   clearBlocks();
   addBlock({ type:(jobTypesOf(j)[0]||""), mins:j.actualMins, labour:j.labourCharged, partsCharged:j.partsCharged, partsCost:j.partsCost,
@@ -799,7 +809,7 @@ function deleteJob(){
 }
 function clearForm(){
   editingId=null; selCustomerId=null; pendingLog=null;
-  ["customer","phone","reg","make","model"].forEach(id=>$("#"+id).value="");
+  ["customer","phone","reg","make","model","mileage"].forEach(id=>$("#"+id).value="");
   $("#customerCars").innerHTML=""; $("#regAge").textContent=""; $("#jobDate").value=today();
   clearBlocks(); addBlock();
   $("#saveBtn").textContent="Save"; $("#cancelBtn").style.display="none"; $("#deleteBtn").style.display="none";
@@ -921,7 +931,7 @@ function renderStats(){
 /* ---------- export ---------- */
 function exportCSV(){
   if(!jobs.length){ toast("No jobs to export"); return; }
-  const cols=["date","jobType","customer","phone","reg","make","model","ageYears","actualMins","quotedHours","labourCharged","partsCharged","partsCost","motResult","motWork","motCostUs","motCostCustomer","totalCharged","grossProfit","comeback","notes","customer_id","createdAt"];
+  const cols=["date","jobType","customer","phone","reg","make","model","mileage","ageYears","actualMins","labourCharged","partsCharged","partsCost","motResult","motWork","motCostUs","motCostCustomer","totalCharged","grossProfit","notes","customer_id","createdAt"];
   const escc=v=>{ v=(v==null?"":String(v)); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
   const rowOut=j=>{ const c=getCustomer(j.customerId); return { ...j, jobType:typeLabel(j), phone:c?c.phone:"", totalCharged:jobTotal(j), grossProfit:jobGP(j), customer_id:j.customerId }; };
   const csv=cols.join(",")+"\n"+jobs.map(j=>{ const r=rowOut(j); return cols.map(c=>escc(r[c])).join(","); }).join("\n");
@@ -1009,7 +1019,7 @@ function initSupa(){
 }
 function jobFromRow(r){ return { id:r.id, createdAt:r.created_at, date:r.job_date,
   jobType:r.job_type, jobTypes:String(r.job_type||"").split(" + ").map(s=>s.trim()).filter(Boolean),
-  make:r.make||"", model:r.model||"", reg:r.reg||"", customerId:r.customer_id||"",
+  make:r.make||"", model:r.model||"", reg:r.reg||"", mileage:r.mileage||null, customerId:r.customer_id||"",
   ageYears:r.age_years, actualMins:Number(r.actual_mins)||0, quotedHours:Number(r.quoted_hours)||0,
   labourCharged:Number(r.labour_charged)||0, partsCharged:Number(r.parts_charged)||0, partsCost:Number(r.parts_cost)||0,
   motResult:r.mot_result||null, motWork:r.mot_work||"", motCostUs:Number(r.mot_cost_us)||0, motCostCustomer:Number(r.mot_cost_customer)||0,
@@ -1056,7 +1066,7 @@ async function loadOptions(){
   }catch(e){}
 }
 function rowFor(j){ return { id:j.id, created_at:j.createdAt, job_date:j.date, job_type:typeLabel(j), make:j.make,
-  model:j.model, reg:j.reg, customer_id:j.customerId, age_years:j.ageYears, actual_mins:j.actualMins, quoted_hours:j.quotedHours,
+  model:j.model, reg:j.reg, mileage:j.mileage||null, customer_id:j.customerId, age_years:j.ageYears, actual_mins:j.actualMins, quoted_hours:j.quotedHours,
   labour_charged:j.labourCharged, parts_charged:j.partsCharged, parts_cost:j.partsCost,
   mot_result:j.motResult||null, mot_work:j.motWork||"", mot_cost_us:j.motCostUs||0, mot_cost_customer:j.motCostCustomer||0,
   closed:!!j.closed, total_charged:jobTotal(j), customer:j.customer, notes:j.notes, comeback:j.comeback }; }
@@ -1085,6 +1095,8 @@ attachCombo($("#customer"), $("#customerList"), ()=>uniqSort(customers.map(c=>c.
 $("#customer").addEventListener("input", ()=>{ const c=getCustomer(selCustomerId);
   if(!c || c.name.toLowerCase()!==$("#customer").value.trim().toLowerCase()){ selCustomerId=null; $("#customerCars").innerHTML=""; } });
 $("#reg").addEventListener("input", function(){ const p=this.selectionStart; this.value=this.value.toUpperCase(); this.setSelectionRange&&this.setSelectionRange(p,p); showRegAge(); });
+$("#reg").addEventListener("change", autofillFromReg);
+$("#reg").addEventListener("blur", autofillFromReg);
 $("#completeBtn").onclick=function(){ if(this._reopen) reopenJob(); else saveLog(true); };
 $("#jobFilter").addEventListener("click",function(e){ const c=e.target.closest(".chip"); if(!c) return; jobFilter=c.dataset.f;
   [...this.children].forEach(x=>x.classList.toggle("on",x===c)); viewDate=null; renderJobs(); });
