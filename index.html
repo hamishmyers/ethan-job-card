@@ -217,6 +217,7 @@
   <section id="view-jobs" style="display:none;">
     <h1>Jobs</h1>
     <div class="sub" id="jobsCount">No jobs yet</div>
+    <button class="btn grey" id="openCustomersBtn" style="margin-bottom:12px;">👤 Customers</button>
     <div class="chips" id="jobFilter" style="margin-bottom:14px;">
       <span class="chip on" data-f="all">All</span>
       <span class="chip" data-f="open">Open</span>
@@ -245,6 +246,14 @@
     <div class="card" id="purchaseTotals" style="margin-top:14px;"></div>
     <div id="purchaseList"></div>
     <button class="export-link" id="exportPurchasesBtn" style="margin-top:8px;">⬇ Export purchases CSV</button>
+  </section>
+
+  <!-- CUSTOMERS -->
+  <section id="view-customers" style="display:none;">
+    <h1>Customers</h1>
+    <div class="sub" id="custCount"></div>
+    <button class="btn grey" id="addCustomerBtn" style="margin-bottom:14px;">+ Add customer</button>
+    <div id="customerListView"></div>
   </section>
 
   <!-- SETTINGS -->
@@ -927,6 +936,49 @@ function renderDay(list){
   arr.forEach(j=>list.appendChild(jobCard(j)));
 }
 
+/* ---------- customers view ---------- */
+let custViewId=null;
+function customerJobs(id){ return jobs.filter(j=>j.customerId===id); }
+function renderCustomers(){
+  const box=$("#customerListView"); box.innerHTML="";
+  if(custViewId){
+    const c=getCustomer(custViewId);
+    if(!c){ custViewId=null; renderCustomers(); return; }
+    $("#custCount").textContent=c.name;
+    const back=document.createElement("button"); back.className="btn grey"; back.textContent="‹ All customers"; back.style.marginBottom="14px";
+    back.onclick=()=>{ custViewId=null; renderCustomers(); window.scrollTo(0,0); }; box.appendChild(back);
+    const carsTxt=(c.cars||[]).map(car=>(car.reg||"no reg")+(car.make?" "+car.make+(car.model?" "+car.model:""):"")).join(" · ")||"no cars on file";
+    const hd=document.createElement("div"); hd.className="card";
+    hd.innerHTML=`<div style="font-weight:800; font-size:1.1rem;">${esc(c.name)}</div>${c.phone?`<div class="meta" style="margin-top:2px;">${esc(c.phone)}</div>`:""}<div class="meta" style="margin-top:6px;">${esc(carsTxt)}</div>`;
+    box.appendChild(hd);
+    const list=customerJobs(custViewId).slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")));
+    if(!list.length){ const e=document.createElement("div"); e.className="empty"; e.textContent="No jobs for this customer yet."; box.appendChild(e); return; }
+    list.forEach(j=>box.appendChild(jobCard(j)));
+    return;
+  }
+  const sorted=customers.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name)));
+  $("#custCount").textContent=sorted.length+" customer"+(sorted.length===1?"":"s");
+  if(!sorted.length){ box.innerHTML='<div class="empty">No customers yet.</div>'; return; }
+  sorted.forEach(c=>{
+    const js=customerJobs(c.id); const profit=js.filter(j=>j.closed===true).reduce((a,j)=>a+jobGP(j),0);
+    const nCars=(c.cars||[]).length;
+    const d=document.createElement("div"); d.className="job"; d.style.cursor="pointer";
+    d.innerHTML=`<div class="top"><div><div class="ty">${esc(c.name)}</div>
+      <div class="meta">${c.phone?esc(c.phone)+" · ":""}${nCars} car${nCars===1?"":"s"} · ${js.length} job${js.length===1?"":"s"}</div></div>
+      <div class="gph">${gbp(profit)}<div class="meta" style="text-align:right; color:var(--muted);">profit ›</div></div></div>`;
+    d.onclick=()=>{ custViewId=c.id; renderCustomers(); window.scrollTo(0,0); };
+    box.appendChild(d);
+  });
+}
+function addCustomerPrompt(){
+  showPrompt("New customer name","Full name",(name)=>{
+    const m=customersByName(name);
+    if(m.length){ custViewId=m[0].id; renderCustomers(); toast("Already exists — opened it"); return; }
+    const c={id:uid(), name:name, phone:"", createdAt:new Date().toISOString(), cars:[]};
+    customers.push(c); save(LS_CUST,customers); if(sb)pushCustomer(c); custViewId=c.id; renderCustomers(); toast("Customer added");
+  });
+}
+
 /* ---------- stats (split multi-type jobs evenly) ---------- */
 function renderStats(){
   const sum=$("#statsSummary");
@@ -1123,9 +1175,9 @@ async function pushCustomer(c){ if(!sb||!c) return; try{ await sb.from("customer
 
 /* ---------- nav ---------- */
 function showView(v){
-  ["log","jobs","parts","stats","settings"].forEach(n=>$("#view-"+n).style.display=(n===v?"block":"none"));
+  ["log","jobs","parts","stats","customers","settings"].forEach(n=>$("#view-"+n).style.display=(n===v?"block":"none"));
   document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b.dataset.view===v));
-  if(v==="jobs") renderJobs(); if(v==="stats") renderStats(); if(v==="parts") renderPurchases();
+  if(v==="jobs") renderJobs(); if(v==="stats") renderStats(); if(v==="parts") renderPurchases(); if(v==="customers") renderCustomers();
   if(["log","jobs","parts","stats"].includes(v)) save("joblog.view.v1", v);
   window.scrollTo(0,0);
 }
@@ -1147,6 +1199,8 @@ $("#jobFilter").addEventListener("click",function(e){ const c=e.target.closest("
   [...this.children].forEach(x=>x.classList.toggle("on",x===c)); viewDate=null; renderJobs(); });
 $("#bdEditBtn").onclick=function(){ closeBreakdown(); if(bdJobId) editJob(bdJobId); };
 $("#bdCloseBtn").onclick=closeBreakdown;
+$("#openCustomersBtn").onclick=()=>{ custViewId=null; showView("customers"); };
+$("#addCustomerBtn").onclick=addCustomerPrompt;
 $("#addAnotherBtn").onclick=()=>{ collapseAllBlocks(); addBlock(); window.scrollTo({top:document.body.scrollHeight,behavior:"smooth"}); };
 $("#jobBlocks").addEventListener("click",e=>{
   const rm=e.target.closest(".blkRemove"); if(rm){ removeBlock(+rm.dataset.id); return; }
