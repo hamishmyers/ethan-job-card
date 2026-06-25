@@ -43,31 +43,40 @@ ${inner}
     subject = `Job Log — nothing logged today (${niceDate})`;
     html = shell(`<tr><td style="padding:28px 24px;color:#111111;font-size:15px;">No jobs logged today. 👍</td></tr>`);
   } else {
+    const done = jobs.filter(j => j.closed === true);
+    const openJobs = jobs.filter(j => j.closed !== true);
     let tCharged = 0, tProfit = 0;
-    const rows = jobs.map(j => {
+    done.forEach(j => {
       const charged = (+j.labour_charged || 0) + (+j.parts_charged || 0) + (+j.mot_cost_customer || 0);
       const cost = (+j.parts_cost || 0) + (+j.mot_cost_us || 0);
-      const profit = charged - cost; tCharged += charged; tProfit += profit;
-      const openBadge = j.closed === false ? ` <span style="background:#fef3c7;color:#92400e;font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;">OPEN</span>` : "";
+      tCharged += charged; tProfit += charged - cost;
+    });
+    const jobRow = (j, withProfit) => {
+      const charged = (+j.labour_charged || 0) + (+j.parts_charged || 0) + (+j.mot_cost_customer || 0);
+      const cost = (+j.parts_cost || 0) + (+j.mot_cost_us || 0);
       const sub = [j.customer || "no customer", j.reg || ""].filter(Boolean).map(esc).join(" · ");
+      const right = withProfit
+        ? `<div style="font-weight:800;color:${GREEN};font-size:15px;">${gbp(charged - cost)}</div><div style="color:${MUTED};font-size:11px;">profit</div>`
+        : `<div style="font-weight:700;color:#92400e;font-size:11px;background:#fef3c7;padding:3px 8px;border-radius:6px;display:inline-block;">OPEN</div>`;
       return `<tr>
 <td style="padding:11px 0;border-top:1px solid ${LINE};">
-<div style="font-weight:700;color:#111111;font-size:14px;">${esc(j.job_type || "Job")}${openBadge}</div>
+<div style="font-weight:700;color:#111111;font-size:14px;">${esc(j.job_type || "Job")}</div>
 <div style="color:${MUTED};font-size:12px;margin-top:1px;">${sub}</div>
 </td>
-<td style="padding:11px 0;border-top:1px solid ${LINE};text-align:right;white-space:nowrap;vertical-align:top;">
-<div style="font-weight:800;color:${GREEN};font-size:15px;">${gbp(profit)}</div>
-<div style="color:${MUTED};font-size:11px;">profit</div>
-</td></tr>`;
-    }).join("");
-    subject = `Job Log — ${jobs.length} job${jobs.length > 1 ? "s" : ""}, ${gbp(tProfit)} profit (${niceDate})`;
+<td style="padding:11px 0;border-top:1px solid ${LINE};text-align:right;white-space:nowrap;vertical-align:top;">${right}</td></tr>`;
+    };
+    subject = `Job Log — ${done.length} completed${openJobs.length ? `, ${openJobs.length} open` : ""}, ${gbp(tProfit)} profit (${niceDate})`;
     const metrics = `<tr><td style="padding:22px 24px 8px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-<td width="33%" style="text-align:center;"><div style="font-size:22px;font-weight:800;color:#111111;">${jobs.length}</div><div style="font-size:12px;color:${MUTED};">jobs</div></td>
+<td width="33%" style="text-align:center;"><div style="font-size:22px;font-weight:800;color:#111111;">${done.length}</div><div style="font-size:12px;color:${MUTED};">completed${openJobs.length ? ` (+${openJobs.length} open)` : ""}</div></td>
 <td width="33%" style="text-align:center;border-left:1px solid ${LINE};border-right:1px solid ${LINE};"><div style="font-size:22px;font-weight:800;color:#111111;">${gbp(tCharged)}</div><div style="font-size:12px;color:${MUTED};">charged</div></td>
 <td width="33%" style="text-align:center;"><div style="font-size:22px;font-weight:800;color:${GREEN};">${gbp(tProfit)}</div><div style="font-size:12px;color:${MUTED};">profit</div></td>
 </tr></table></td></tr>`;
-    const list = `<tr><td style="padding:8px 24px 22px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">${rows}</table></td></tr>`;
+    let listInner = done.map(j => jobRow(j, true)).join("");
+    if (openJobs.length) {
+      listInner += `<tr><td colspan="2" style="padding:16px 0 2px;border-top:1px solid ${LINE};color:${MUTED};font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Open — not counted in profit</td></tr>` + openJobs.map(j => jobRow(j, false)).join("");
+    }
+    const list = `<tr><td style="padding:8px 24px 22px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">${listInner}</table></td></tr>`;
     html = shell(metrics + list);
   }
 
