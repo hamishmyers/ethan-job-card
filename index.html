@@ -299,6 +299,7 @@
     <div class="affix"><span>£</span><input id="pGross" type="number" inputmode="decimal" placeholder="0" /></div>
     <label>Note <span class="opt">(optional)</span></label>
     <input id="pNote" placeholder="What it was for" autocomplete="off" />
+    <a id="pPhotoLink" target="_blank" rel="noopener" style="display:none; margin-top:10px; color:var(--accent2); font-weight:600;">📎 View photo</a>
     <button class="btn green" id="pSaveBtn" style="margin-top:16px;">Save</button>
     <button class="btn red" id="pDeleteBtn" style="display:none;">Delete</button>
     <button class="btn grey" id="pCancelBtn">Cancel</button>
@@ -400,6 +401,8 @@ const MODELS_BY_MAKE = {
 const LS_JOBS="joblog.jobs.v3", LS_SUPA="joblog.supa.v1", LS_CUST="joblog.customers.v1",
   LS_MAKES="joblog.makes.v1", LS_MODELS="joblog.models.v1", LS_TYPES="joblog.types.v1";
 const SUPA_DEFAULT = { url:"https://gvyvjfldvbwdiexjyxzh.supabase.co", key:"sb_publishable_qRVzjnqhCrUN6xxrKlWDtw_aSprTZ0T" };
+const BUCKET = "joblog";
+let pendingPhotoB64=null, pendingPartsPhotoB64=null;
 
 /* ---------- state ---------- */
 let jobs = load(LS_JOBS, []);
@@ -635,7 +638,7 @@ function onPickCustomer(name){ const m=customersByName(name);
 
 /* ---------- save / edit / delete ---------- */
 let pendingLog=null;
-function saveLog(markComplete){
+async function saveLog(markComplete){
   applyRunningStopwatches();
   const list=gatherBlocks().filter(b=>b.type);
   if(!list.length){ toast("Add at least one job (pick a type)"); return; }
@@ -646,6 +649,7 @@ function saveLog(markComplete){
   pendingLog={ shared:{ date:$("#jobDate").value||today(), customer:$("#customer").value.trim(), phone:$("#phone").value.trim(),
       reg:$("#reg").value.trim().toUpperCase(), make:$("#make").value.trim(), model:$("#model").value.trim(), mileage:Number($("#mileage").value)||null },
     list, markComplete:!!markComplete };
+  if(pendingPhotoB64){ const u=await uploadPhoto(pendingPhotoB64,"invoices"); if(u) pendingLog.shared.photoUrl=u; }
   resolveCustomerThenSaveLog();
 }
 function resolveCustomerThenSaveLog(){
@@ -668,13 +672,13 @@ function commitLog(customerId, createNew){
     const j=jobs.find(x=>x.id===editingId), b=pendingLog.list[0];
     if(j){ Object.assign(j,{ date:s.date, customer:s.customer, reg:s.reg, make:s.make, model:s.model, mileage:s.mileage, customerId:customerId||"", ageYears:age,
       jobTypes:[b.type], jobType:b.type, actualMins:b.mins, labourCharged:b.labour, partsCharged:b.partsCharged, partsCost:b.partsCost,
-      notes:b.notes, motResult:b.motResult, motWork:b.motWork, motCostUs:b.motCostUs, motCostCustomer:b.motCostCustomer, closed }); j.synced=false; if(sb)pushOne(j); }
+      notes:b.notes, motResult:b.motResult, motWork:b.motWork, motCostUs:b.motCostUs, motCostCustomer:b.motCostCustomer, photoUrl:(s.photoUrl||j.photoUrl||""), closed }); j.synced=false; if(sb)pushOne(j); }
     toast("Updated ✓");
   } else {
     pendingLog.list.forEach(b=>{ const j={ id:uid(), createdAt:new Date().toISOString(), date:s.date,
       jobTypes:[b.type], jobType:b.type, actualMins:b.mins, labourCharged:b.labour, partsCharged:b.partsCharged, partsCost:b.partsCost,
       make:s.make, model:s.model, mileage:s.mileage, ageYears:age, customer:s.customer, reg:s.reg, customerId:customerId||"",
-      notes:b.notes, comeback:false, motResult:b.motResult, motWork:b.motWork, motCostUs:b.motCostUs, motCostCustomer:b.motCostCustomer, closed, synced:false };
+      notes:b.notes, comeback:false, motResult:b.motResult, motWork:b.motWork, motCostUs:b.motCostUs, motCostCustomer:b.motCostCustomer, photoUrl:(s.photoUrl||""), closed, synced:false };
       jobs.unshift(j); if(sb)pushOne(j); });
     toast(closed?"Saved & completed ✓":"Saved — "+pendingLog.list.length+" job"+(pendingLog.list.length>1?"s":""));
   }
@@ -731,6 +735,7 @@ function scanInvoice(file){
   $("#scanModal").classList.add("open");
   fileToResizedB64(file, 1600, async (b64)=>{
     if(!b64){ closeScan(); toast("Couldn't read that image"); return; }
+    pendingPhotoB64=b64;
     try{
       const r=await fetch("/api/scan",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({image:b64, media_type:"image/jpeg"})});
       const d=await r.json();
@@ -810,7 +815,7 @@ function deleteJob(){
 function clearForm(){
   editingId=null; selCustomerId=null; pendingLog=null;
   ["customer","phone","reg","make","model","mileage"].forEach(id=>$("#"+id).value="");
-  $("#customerCars").innerHTML=""; $("#regAge").textContent=""; $("#jobDate").value=today();
+  $("#customerCars").innerHTML=""; $("#regAge").textContent=""; $("#jobDate").value=today(); pendingPhotoB64=null;
   clearBlocks(); addBlock();
   $("#saveBtn").textContent="Save"; $("#cancelBtn").style.display="none"; $("#deleteBtn").style.display="none";
   $("#addAnotherBtn").style.display="flex";
@@ -852,7 +857,8 @@ function openBreakdown(id){
     <div class="stat"><span>Your cost</span><span class="v">${gbp(cost)}</span></div>
     <div class="stat"><span>Profit</span><span class="v" style="color:var(--accent)">${gbp(jobGP(j))}</span></div>
     <div class="stat"><span>Time</span><span class="v">${Number(j.actualMins)>0?j.actualMins+" min":"—"}</span></div>
-    <div class="stat"><span>Profit / hour</span><span class="v">${gph!=null?gbp(gph):"—"}</span></div>`;
+    <div class="stat"><span>Profit / hour</span><span class="v">${gph!=null?gbp(gph):"—"}</span></div>`
+    + (j.photoUrl?`<a href="${esc(j.photoUrl)}" target="_blank" rel="noopener" style="display:inline-block; margin-top:12px; color:var(--accent2); font-weight:600;">📎 View invoice photo</a>`:"");
   $("#breakdownModal").classList.add("open");
 }
 function closeBreakdown(){ $("#breakdownModal").classList.remove("open"); }
@@ -950,15 +956,17 @@ function openPurchase(data, id){
   $("#pVat").value=(data.vat!=null&&data.vat!=="")?data.vat:"";
   $("#pGross").value=(data.gross!=null&&data.gross!=="")?data.gross:"";
   $("#pNote").value=data.notes||data.description||"";
+  const pl=$("#pPhotoLink"); if(data.photoUrl){ pl.href=data.photoUrl; pl.style.display="inline-block"; } else pl.style.display="none";
   $("#pDeleteBtn").style.display=id?"flex":"none";
   $("#purchaseModal").classList.add("open");
 }
-function closePurchase(){ $("#purchaseModal").classList.remove("open"); editingPurchaseId=null; }
-function savePurchase(){
+function closePurchase(){ $("#purchaseModal").classList.remove("open"); editingPurchaseId=null; pendingPartsPhotoB64=null; }
+async function savePurchase(){
   const p={ supplier:$("#pSupplier").value.trim(), date:$("#pDate").value||today(),
     net:Number($("#pNet").value)||0, vat:Number($("#pVat").value)||0, gross:Number($("#pGross").value)||0, notes:$("#pNote").value.trim() };
   if(!p.supplier && !p.gross && !p.net){ toast("Add a supplier or amount"); return; }
-  if(editingPurchaseId){ const e=purchases.find(x=>x.id===editingPurchaseId); if(e){ Object.assign(e,p); if(sb)pushPurchase(e); } }
+  if(pendingPartsPhotoB64){ const u=await uploadPhoto(pendingPartsPhotoB64,"parts"); if(u) p.photoUrl=u; pendingPartsPhotoB64=null; }
+  if(editingPurchaseId){ const e=purchases.find(x=>x.id===editingPurchaseId); if(e){ if(!p.photoUrl) p.photoUrl=e.photoUrl; Object.assign(e,p); if(sb)pushPurchase(e); } }
   else { const np={ id:uid(), createdAt:new Date().toISOString(), ...p }; purchases.unshift(np); if(sb)pushPurchase(np); }
   save("joblog.purchases.v1",purchases); closePurchase(); renderPurchases(); toast("Saved ✓");
 }
@@ -1001,6 +1009,7 @@ function scanParts(file){
   if(!file) return; $("#scanModal").classList.add("open"); $("#scanMsg").textContent="Reading parts invoice…";
   fileToResizedB64(file,1600, async(b64)=>{
     if(!b64){ closeScan(); toast("Couldn't read that image"); return; }
+    pendingPartsPhotoB64=b64;
     try{ const r=await fetch("/api/scan",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({image:b64, media_type:"image/jpeg", mode:"parts"})});
       const d=await r.json(); closeScan();
       if(!r.ok){ toast(d.error||"Scan failed"); return; }
@@ -1008,8 +1017,20 @@ function scanParts(file){
     }catch(e){ closeScan(); toast("Scan failed"); }
   });
 }
-function pushPurchase(p){ if(!sb||!p) return; try{ sb.from("purchases").upsert({ id:p.id, created_at:p.createdAt, purchase_date:p.date, supplier:p.supplier, net:p.net, vat:p.vat, gross:p.gross, notes:p.notes }).then(()=>{}); }catch(e){} }
+function pushPurchase(p){ if(!sb||!p) return; try{ sb.from("purchases").upsert({ id:p.id, created_at:p.createdAt, purchase_date:p.date, supplier:p.supplier, net:p.net, vat:p.vat, gross:p.gross, notes:p.notes, photo_url:p.photoUrl||null }).then(()=>{}); }catch(e){} }
 
+async function uploadPhoto(b64, kind){
+  if(!sb||!b64) return null;
+  try{
+    const bin=atob(b64); const arr=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+    const blob=new Blob([arr],{type:"image/jpeg"});
+    const path=kind+"/"+uid()+".jpg";
+    const {error}=await sb.storage.from(BUCKET).upload(path, blob, {contentType:"image/jpeg", upsert:false});
+    if(error) return null;
+    const {data}=sb.storage.from(BUCKET).getPublicUrl(path);
+    return data?data.publicUrl:null;
+  }catch(e){ return null; }
+}
 function setCloudBadge(on){ document.querySelectorAll("#cloudBadge,#cloudBadge2").forEach(b=>{ b.textContent=on?"cloud":"local"; b.classList.toggle("on",on); }); }
 function initSupa(){
   if(supa.url && supa.key && window.supabase){
@@ -1023,10 +1044,10 @@ function jobFromRow(r){ return { id:r.id, createdAt:r.created_at, date:r.job_dat
   ageYears:r.age_years, actualMins:Number(r.actual_mins)||0, quotedHours:Number(r.quoted_hours)||0,
   labourCharged:Number(r.labour_charged)||0, partsCharged:Number(r.parts_charged)||0, partsCost:Number(r.parts_cost)||0,
   motResult:r.mot_result||null, motWork:r.mot_work||"", motCostUs:Number(r.mot_cost_us)||0, motCostCustomer:Number(r.mot_cost_customer)||0,
-  customer:r.customer||"", notes:r.notes||"", comeback:!!r.comeback,
+  customer:r.customer||"", notes:r.notes||"", comeback:!!r.comeback, photoUrl:r.photo_url||"",
   closed:(r.closed!=null?!!r.closed:((Number(r.labour_charged)||0)+(Number(r.parts_charged)||0)+(Number(r.mot_cost_customer)||0)>0)), synced:true }; }
 function custFromRow(r){ return { id:r.id, name:r.name||"", phone:r.phone||"", cars:Array.isArray(r.cars)?r.cars:(r.cars||[]), createdAt:r.created_at }; }
-function purchFromRow(r){ return { id:r.id, createdAt:r.created_at, date:r.purchase_date, supplier:r.supplier||"", net:Number(r.net)||0, vat:Number(r.vat)||0, gross:Number(r.gross)||0, notes:r.notes||"" }; }
+function purchFromRow(r){ return { id:r.id, createdAt:r.created_at, date:r.purchase_date, supplier:r.supplier||"", net:Number(r.net)||0, vat:Number(r.vat)||0, gross:Number(r.gross)||0, notes:r.notes||"", photoUrl:r.photo_url||"" }; }
 function mergeJobs(remote){ const byId={}; jobs.forEach(j=>byId[j.id]=j);
   remote.forEach(r=>{ const ex=byId[r.id]; if(!(ex && ex.synced===false)) byId[r.id]=r; });
   jobs=Object.values(byId).sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||""))); save(LS_JOBS,jobs); }
@@ -1069,7 +1090,7 @@ function rowFor(j){ return { id:j.id, created_at:j.createdAt, job_date:j.date, j
   model:j.model, reg:j.reg, mileage:j.mileage||null, customer_id:j.customerId, age_years:j.ageYears, actual_mins:j.actualMins, quoted_hours:j.quotedHours,
   labour_charged:j.labourCharged, parts_charged:j.partsCharged, parts_cost:j.partsCost,
   mot_result:j.motResult||null, mot_work:j.motWork||"", mot_cost_us:j.motCostUs||0, mot_cost_customer:j.motCostCustomer||0,
-  closed:!!j.closed, total_charged:jobTotal(j), customer:j.customer, notes:j.notes, comeback:j.comeback }; }
+  closed:!!j.closed, photo_url:j.photoUrl||null, total_charged:jobTotal(j), customer:j.customer, notes:j.notes, comeback:j.comeback }; }
 async function pushOne(j){ if(!sb) return; try{ const {error}=await sb.from("jobs").upsert(rowFor(j)); if(!error){ j.synced=true; save(LS_JOBS,jobs); } }catch(e){} }
 function custRow(c){ return { id:c.id, name:c.name, phone:c.phone||"", cars:c.cars||[],
   created_at:c.createdAt||new Date().toISOString(), updated_at:new Date().toISOString() }; }
