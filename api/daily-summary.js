@@ -28,14 +28,14 @@ export default async function handler(req, res) {
   const esc = s => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   let niceDate = ymd;
   try { niceDate = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "Europe/London" }).format(new Date(ymd + "T12:00:00")); } catch (e) {}
-  const BRAND = "#0b1120", GREEN = "#16a34a", MUTED = "#6b7280", LINE = "#e5e7eb", BG = "#f4f5f7";
+  const BRAND = "#012019", LIME = "#c8e25c", GREEN = "#16a34a", MUTED = "#6b7280", LINE = "#e5e7eb", BG = "#f4f5f7";
   const shell = inner => `<!doctype html><html><body style="margin:0;padding:0;background:${BG};">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BG};padding:24px 12px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
 <tr><td align="center">
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border:1px solid ${LINE};border-radius:14px;overflow:hidden;">
 <tr><td style="background:${BRAND};padding:20px 24px;">
-<div style="color:#ffffff;font-size:18px;font-weight:700;">🔧 Job Log — daily summary</div>
-<div style="color:#9aa7bd;font-size:13px;margin-top:3px;">${niceDate}</div>
+<div style="font-size:19px;font-weight:800;letter-spacing:-.01em;color:#ffffff;">Pit<span style="color:${LIME};">wall</span> <span style="color:#9fb7ac;font-weight:600;">— daily summary</span></div>
+<div style="color:#9fb7ac;font-size:13px;margin-top:3px;">${niceDate}</div>
 </td></tr>
 ${inner}
 <tr><td style="padding:16px 24px;border-top:1px solid ${LINE};color:${MUTED};font-size:12px;">Automated summary · sent Monday to Thursday</td></tr>
@@ -43,7 +43,7 @@ ${inner}
 
   let subject, html;
   if (!jobs.length) {
-    subject = `Job Log — nothing logged today (${niceDate})`;
+    subject = `Pitwall — nothing logged today (${niceDate})`;
     html = shell(`<tr><td style="padding:28px 24px;color:#111111;font-size:15px;">No jobs logged today. 👍</td></tr>`);
   } else {
     const done = jobs.filter(j => j.closed === true);
@@ -68,7 +68,7 @@ ${inner}
 </td>
 <td style="padding:11px 0;border-top:1px solid ${LINE};text-align:right;white-space:nowrap;vertical-align:top;">${right}</td></tr>`;
     };
-    subject = `Job Log — ${done.length} completed${openJobs.length ? `, ${openJobs.length} open` : ""}, ${gbp(tProfit)} profit (${niceDate})`;
+    subject = `Pitwall — ${done.length} completed${openJobs.length ? `, ${openJobs.length} open` : ""}, ${gbp(tProfit)} profit (${niceDate})`;
     const metrics = `<tr><td style="padding:22px 24px 8px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
 <td width="33%" style="text-align:center;"><div style="font-size:22px;font-weight:800;color:#111111;">${done.length}</div><div style="font-size:12px;color:${MUTED};">completed${openJobs.length ? ` (+${openJobs.length} open)` : ""}</div></td>
@@ -87,7 +87,7 @@ ${inner}
     const er = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: "Bearer " + RESEND, "content-type": "application/json" },
-      body: JSON.stringify({ from: "Job Log <onboarding@resend.dev>", to: [TO], subject, html })
+      body: JSON.stringify({ from: "Pitwall <onboarding@resend.dev>", to: [TO], subject, html })
     });
     const ed = await er.json();
     if (!er.ok) { res.status(502).json({ error: (ed && ed.message) || "email failed", detail: ed }); return; }
