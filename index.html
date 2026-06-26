@@ -18,6 +18,19 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
 <title>Pitwall</title>
+<meta name="description" content="Log every job in seconds and find out which ones actually pay. Create your free account." />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Pitwall" />
+<meta property="og:title" content="Pitwall — see the profit in every job" />
+<meta property="og:description" content="Log every job in seconds and find out which ones actually pay. Create your free account." />
+<meta property="og:image" content="https://ethan-job-card.vercel.app/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:url" content="https://ethan-job-card.vercel.app/join" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Pitwall — see the profit in every job" />
+<meta name="twitter:description" content="Log every job in seconds and find out which ones actually pay." />
+<meta name="twitter:image" content="https://ethan-job-card.vercel.app/og-image.png" />
 <style>
   :root{
     --bg:#012019; --bg2:#02312a;
@@ -187,6 +200,14 @@
       <div class="sub" id="authSub" style="margin-top:7px; margin-bottom:0;">Know what every job's really worth</div>
     </div>
     <div class="card">
+      <div id="authBenefits" style="display:none; margin:0 0 4px;">
+        <div style="display:flex; gap:12px; align-items:center; padding:9px 0; border-bottom:1px solid var(--line);">
+          <span style="font-size:1.15rem; width:22px; text-align:center;">📷</span><span style="font-size:.95rem;">Log a job in seconds — snap the invoice</span></div>
+        <div style="display:flex; gap:12px; align-items:center; padding:9px 0; border-bottom:1px solid var(--line);">
+          <span style="font-size:1.15rem; width:22px; text-align:center;">💷</span><span style="font-size:.95rem;">See the real profit on every job</span></div>
+        <div style="display:flex; gap:12px; align-items:center; padding:9px 0 13px;">
+          <span style="font-size:1.15rem; width:22px; text-align:center;">📊</span><span style="font-size:.95rem;">Find which jobs actually pay</span></div>
+      </div>
       <div id="authEmailRow">
         <label>Email</label>
         <input id="authEmail" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" />
@@ -195,7 +216,8 @@
       <input id="authPass" type="password" autocomplete="current-password" placeholder="••••••••" />
       <small class="hint" id="authErr" style="color:var(--danger); display:none;"></small>
       <button class="btn green" id="authPrimary" style="margin-top:16px;">Sign in</button>
-      <button class="btn grey" id="authToggle">Create an account</button>
+      <div id="authReassure" style="display:none; text-align:center; color:var(--muted); font-size:.78rem; margin-top:10px;">Free to set up · takes under a minute</div>
+      <button class="btn grey" id="authToggle" style="margin-top:10px;">Create an account</button>
       <button class="export-link" id="authForgot" style="margin:10px auto 0; display:block;">Forgot password?</button>
     </div>
   </div>
@@ -1203,7 +1225,9 @@ function setCloudBadge(on){ document.querySelectorAll("#cloudBadge,#cloudBadge2"
 
 /* ---------- auth ---------- */
 let currentUser=null, authMode="signin";
-function showAuth(){ $("#authScreen").style.display="block"; const n=document.querySelector("nav"); if(n) n.style.display="none"; $("#cogBtn").style.display="none"; document.querySelector(".wrap").style.display="none"; }
+const JOIN_INTENT = /(^|\/)join(\/|$)/i.test(location.pathname) || /[?&](signup|join)\b/i.test(location.search);
+function showAuth(){ $("#authScreen").style.display="block"; const n=document.querySelector("nav"); if(n) n.style.display="none"; $("#cogBtn").style.display="none"; document.querySelector(".wrap").style.display="none";
+  if(JOIN_INTENT && authMode!=="recovery") setAuthMode("signup"); }
 function enterApp(){ $("#authScreen").style.display="none"; const n=document.querySelector("nav"); if(n) n.style.display="flex"; $("#cogBtn").style.display="flex"; document.querySelector(".wrap").style.display="block";
   setCloudBadge(true); if($("#acctEmail")&&currentUser) $("#acctEmail").textContent=currentUser.email||"";
   flushUnsynced(); pullAll(); renderJobs(); renderStats(); showView(load("joblog.view.v1","log")); maybeWelcome(); }
@@ -1217,7 +1241,10 @@ function setAuthMode(m){ authMode=m;
   $("#authToggle").textContent= signup?"I already have an account":"Create an account";
   $("#authForgot").style.display= (!signup&&!recovery)?"block":"none";
   $("#authEmailRow").style.display= recovery?"none":"block";
-  $("#authSub").textContent= recovery?"Choose a new password":(signup?"Create your account":"Know what every job's really worth");
+  $("#authSub").textContent= recovery?"Choose a new password":(signup?"Set up your account — it's free":"Know what every job's really worth");
+  const ben=$("#authBenefits"), rea=$("#authReassure");
+  if(ben) ben.style.display= signup?"block":"none";
+  if(rea) rea.style.display= signup?"block":"none";
   $("#authErr").style.display="none"; $("#authErr").style.color="var(--danger)"; }
 function authError(m){ const e=$("#authErr"); e.textContent=m; e.style.color="var(--danger)"; e.style.display="block"; }
 function authNote(m){ const e=$("#authErr"); e.textContent=m; e.style.color="var(--accent)"; e.style.display="block"; }

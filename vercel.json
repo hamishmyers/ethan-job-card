@@ -1,4 +1,7 @@
 {
+  "rewrites": [
+    { "source": "/join", "destination": "/index.html" }
+  ],
   "crons": [
     { "path": "/api/daily-summary", "schedule": "0 19 * * 1-4" }
   ]
