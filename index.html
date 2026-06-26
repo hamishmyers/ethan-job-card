@@ -159,13 +159,16 @@
     <h1 style="text-align:center;">🔧 Job Log</h1>
     <div class="sub" id="authSub" style="text-align:center;">Sign in to your account</div>
     <div class="card">
-      <label>Email</label>
-      <input id="authEmail" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" />
+      <div id="authEmailRow">
+        <label>Email</label>
+        <input id="authEmail" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" />
+      </div>
       <label>Password</label>
       <input id="authPass" type="password" autocomplete="current-password" placeholder="••••••••" />
       <small class="hint" id="authErr" style="color:var(--danger); display:none;"></small>
       <button class="btn green" id="authPrimary" style="margin-top:16px;">Sign in</button>
       <button class="btn grey" id="authToggle">Create an account</button>
+      <button class="export-link" id="authForgot" style="margin:10px auto 0; display:block;">Forgot password?</button>
     </div>
   </div>
 </div>
@@ -1138,14 +1141,28 @@ function enterApp(){ $("#authScreen").style.display="none"; const n=document.que
   setCloudBadge(true); if($("#acctEmail")&&currentUser) $("#acctEmail").textContent=currentUser.email||"";
   flushUnsynced(); pullAll(); renderJobs(); renderStats(); showView(load("joblog.view.v1","log")); }
 function setAuthMode(m){ authMode=m;
-  $("#authPrimary").textContent=m==="signup"?"Create account":"Sign in";
-  $("#authToggle").textContent=m==="signup"?"I already have an account":"Create an account";
-  $("#authSub").textContent=m==="signup"?"Create your account":"Sign in to your account";
-  $("#authErr").style.display="none"; }
-function authError(m){ const e=$("#authErr"); e.textContent=m; e.style.display="block"; }
+  const signup=m==="signup", recovery=m==="recovery";
+  $("#authPrimary").textContent= recovery?"Set new password":(signup?"Create account":"Sign in");
+  $("#authToggle").style.display= recovery?"none":"block";
+  $("#authToggle").textContent= signup?"I already have an account":"Create an account";
+  $("#authForgot").style.display= (!signup&&!recovery)?"block":"none";
+  $("#authEmailRow").style.display= recovery?"none":"block";
+  $("#authSub").textContent= recovery?"Choose a new password":(signup?"Create your account":"Sign in to your account");
+  $("#authErr").style.display="none"; $("#authErr").style.color="var(--danger)"; }
+function authError(m){ const e=$("#authErr"); e.textContent=m; e.style.color="var(--danger)"; e.style.display="block"; }
+function authNote(m){ const e=$("#authErr"); e.textContent=m; e.style.color="var(--accent)"; e.style.display="block"; }
 async function doAuth(){
   if(!sb){ authError("Still connecting, try again in a moment."); return; }
-  const email=$("#authEmail").value.trim(), pass=$("#authPass").value;
+  const pass=$("#authPass").value;
+  if(authMode==="recovery"){
+    if(pass.length<6){ authError("Password must be at least 6 characters."); return; }
+    $("#authPrimary").disabled=true;
+    const { error } = await sb.auth.updateUser({ password:pass });
+    $("#authPrimary").disabled=false;
+    if(error){ authError(error.message); return; }
+    toast("Password updated"); setAuthMode("signin"); return;
+  }
+  const email=$("#authEmail").value.trim();
   if(!email||!pass){ authError("Enter your email and password."); return; }
   $("#authPrimary").disabled=true;
   try{
@@ -1155,11 +1172,22 @@ async function doAuth(){
   }catch(e){ authError(String((e&&e.message)||e)); }
   $("#authPrimary").disabled=false;
 }
+async function forgotPassword(){
+  if(!sb) return;
+  const email=$("#authEmail").value.trim();
+  if(!email){ authError("Enter your email above first."); return; }
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin });
+  if(error){ authError(error.message); return; }
+  authNote("Reset link sent — check your email, then set a new password.");
+}
 async function logout(){ try{ if(sb) await sb.auth.signOut(); }catch(e){} currentUser=null; showAuth(); }
 async function boot(){
   if(!(supa.url && supa.key && window.supabase)){ enterApp(); return; }
   try{ sb=window.supabase.createClient(supa.url,supa.key); }catch(e){ sb=null; enterApp(); return; }
-  sb.auth.onAuthStateChange((_e,sess)=>{ if(sess&&sess.user){ currentUser=sess.user; enterApp(); } else { currentUser=null; showAuth(); } });
+  sb.auth.onAuthStateChange((ev,sess)=>{
+    if(ev==="PASSWORD_RECOVERY"){ currentUser=sess?sess.user:null; showAuth(); setAuthMode("recovery"); return; }
+    if(sess&&sess.user){ currentUser=sess.user; enterApp(); } else { currentUser=null; showAuth(); }
+  });
   try{ const { data:{ session } } = await sb.auth.getSession(); if(session&&session.user){ currentUser=session.user; enterApp(); } else { showAuth(); } }
   catch(e){ showAuth(); }
 }
@@ -1280,6 +1308,7 @@ $("#cogBtn").onclick=function(){ showView("settings"); };
 $("#settingsBack").onclick=function(){ showView("log"); };
 $("#authPrimary").onclick=doAuth;
 $("#authToggle").onclick=()=>setAuthMode(authMode==="signup"?"signin":"signup");
+$("#authForgot").onclick=forgotPassword;
 $("#authPass").addEventListener("keydown",e=>{ if(e.key==="Enter") doAuth(); });
 $("#logoutBtn").onclick=logout;
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{
