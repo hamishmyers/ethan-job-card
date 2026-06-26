@@ -2,7 +2,7 @@
 // Scheduled in vercel.json (Mon-Thu). Sends via Resend.
 // Env vars required: RESEND_API_KEY, SUMMARY_EMAIL. Optional: CRON_SECRET.
 const SUPA_URL = "https://gvyvjfldvbwdiexjyxzh.supabase.co";
-const SUPA_KEY = "sb_publishable_qRVzjnqhCrUN6xxrKlWDtw_aSprTZ0T";
+const SUPA_PUBLISHABLE = "sb_publishable_qRVzjnqhCrUN6xxrKlWDtw_aSprTZ0T";
 
 export default async function handler(req, res) {
   const secret = process.env.CRON_SECRET;
@@ -12,12 +12,15 @@ export default async function handler(req, res) {
   const RESEND = process.env.RESEND_API_KEY, TO = process.env.SUMMARY_EMAIL;
   if (!RESEND || !TO) { res.status(500).json({ error: "Set RESEND_API_KEY and SUMMARY_EMAIL in Vercel env vars." }); return; }
 
+  // After the database is locked down per-user (RLS), reads need the service key.
+  const KEY = process.env.SUPABASE_SERVICE_KEY || SUPA_PUBLISHABLE;
+  const userFilter = process.env.SUMMARY_USER_ID ? `&user_id=eq.${process.env.SUMMARY_USER_ID}` : "";
   const ymd = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/London" }).format(new Date());
-  const url = `${SUPA_URL}/rest/v1/jobs?select=job_type,customer,reg,labour_charged,parts_charged,parts_cost,mot_cost_customer,mot_cost_us,closed,created_at&created_at=gte.${ymd}T00:00:00&order=created_at.desc`;
+  const url = `${SUPA_URL}/rest/v1/jobs?select=job_type,customer,reg,labour_charged,parts_charged,parts_cost,mot_cost_customer,mot_cost_us,closed,created_at&created_at=gte.${ymd}T00:00:00${userFilter}&order=created_at.desc`;
 
   let jobs = [];
   try {
-    const r = await fetch(url, { headers: { apikey: SUPA_KEY, Authorization: "Bearer " + SUPA_KEY } });
+    const r = await fetch(url, { headers: { apikey: KEY, Authorization: "Bearer " + KEY } });
     jobs = await r.json(); if (!Array.isArray(jobs)) jobs = [];
   } catch (e) { jobs = []; }
 

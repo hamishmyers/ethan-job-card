@@ -154,6 +154,22 @@
 <button class="cog" id="cogBtn" aria-label="Settings">⚙️</button>
 <datalist id="typeOptions"></datalist>
 
+<div id="authScreen" style="display:none; position:fixed; inset:0; z-index:200; background:var(--bg); padding:24px; overflow:auto;">
+  <div style="max-width:420px; margin:8vh auto 0;">
+    <h1 style="text-align:center;">🔧 Job Log</h1>
+    <div class="sub" id="authSub" style="text-align:center;">Sign in to your account</div>
+    <div class="card">
+      <label>Email</label>
+      <input id="authEmail" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" />
+      <label>Password</label>
+      <input id="authPass" type="password" autocomplete="current-password" placeholder="••••••••" />
+      <small class="hint" id="authErr" style="color:var(--danger); display:none;"></small>
+      <button class="btn green" id="authPrimary" style="margin-top:16px;">Sign in</button>
+      <button class="btn grey" id="authToggle">Create an account</button>
+    </div>
+  </div>
+</div>
+
 <div class="wrap">
 
   <!-- LOG -->
@@ -260,6 +276,11 @@
   <section id="view-settings" style="display:none;">
     <button class="btn grey" id="settingsBack" style="margin-bottom:14px;">‹ Back</button>
     <h1>Settings</h1>
+    <div class="card">
+      <div style="font-weight:700; margin-bottom:4px;">Account</div>
+      <div class="muted" id="acctEmail" style="font-size:.85rem;"></div>
+      <button class="btn grey" id="logoutBtn" style="margin-top:12px;">Log out</button>
+    </div>
     <div class="card">
       <div style="display:flex; align-items:center; justify-content:space-between;">
         <div style="font-weight:700;">Cloud backup</div>
@@ -1109,11 +1130,38 @@ async function uploadPhoto(b64, kind){
   }catch(e){ return null; }
 }
 function setCloudBadge(on){ document.querySelectorAll("#cloudBadge,#cloudBadge2").forEach(b=>{ b.textContent=on?"cloud":"local"; b.classList.toggle("on",on); }); }
-function initSupa(){
-  if(supa.url && supa.key && window.supabase){
-    try{ sb=window.supabase.createClient(supa.url,supa.key); setCloudBadge(true); flushUnsynced(); pullAll(); }
-    catch(e){ sb=null; setCloudBadge(false); }
-  }
+
+/* ---------- auth ---------- */
+let currentUser=null, authMode="signin";
+function showAuth(){ $("#authScreen").style.display="block"; const n=document.querySelector("nav"); if(n) n.style.display="none"; $("#cogBtn").style.display="none"; document.querySelector(".wrap").style.display="none"; }
+function enterApp(){ $("#authScreen").style.display="none"; const n=document.querySelector("nav"); if(n) n.style.display="flex"; $("#cogBtn").style.display="flex"; document.querySelector(".wrap").style.display="block";
+  setCloudBadge(true); if($("#acctEmail")&&currentUser) $("#acctEmail").textContent=currentUser.email||"";
+  flushUnsynced(); pullAll(); renderJobs(); renderStats(); showView(load("joblog.view.v1","log")); }
+function setAuthMode(m){ authMode=m;
+  $("#authPrimary").textContent=m==="signup"?"Create account":"Sign in";
+  $("#authToggle").textContent=m==="signup"?"I already have an account":"Create an account";
+  $("#authSub").textContent=m==="signup"?"Create your account":"Sign in to your account";
+  $("#authErr").style.display="none"; }
+function authError(m){ const e=$("#authErr"); e.textContent=m; e.style.display="block"; }
+async function doAuth(){
+  if(!sb){ authError("Still connecting, try again in a moment."); return; }
+  const email=$("#authEmail").value.trim(), pass=$("#authPass").value;
+  if(!email||!pass){ authError("Enter your email and password."); return; }
+  $("#authPrimary").disabled=true;
+  try{
+    const res = authMode==="signup" ? await sb.auth.signUp({email,password:pass}) : await sb.auth.signInWithPassword({email,password:pass});
+    if(res.error){ authError(res.error.message); }
+    else if(!res.data.session){ authError("Account created — check your email to confirm, then sign in."); }
+  }catch(e){ authError(String((e&&e.message)||e)); }
+  $("#authPrimary").disabled=false;
+}
+async function logout(){ try{ if(sb) await sb.auth.signOut(); }catch(e){} currentUser=null; showAuth(); }
+async function boot(){
+  if(!(supa.url && supa.key && window.supabase)){ enterApp(); return; }
+  try{ sb=window.supabase.createClient(supa.url,supa.key); }catch(e){ sb=null; enterApp(); return; }
+  sb.auth.onAuthStateChange((_e,sess)=>{ if(sess&&sess.user){ currentUser=sess.user; enterApp(); } else { currentUser=null; showAuth(); } });
+  try{ const { data:{ session } } = await sb.auth.getSession(); if(session&&session.user){ currentUser=session.user; enterApp(); } else { showAuth(); } }
+  catch(e){ showAuth(); }
 }
 function jobFromRow(r){ return { id:r.id, createdAt:r.created_at, date:r.job_date,
   jobType:r.job_type, jobTypes:String(r.job_type||"").split(" + ").map(s=>s.trim()).filter(Boolean),
@@ -1230,14 +1278,16 @@ $("#askInput").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDef
 $("#exportBtn").onclick=exportCSV;
 $("#cogBtn").onclick=function(){ showView("settings"); };
 $("#settingsBack").onclick=function(){ showView("log"); };
+$("#authPrimary").onclick=doAuth;
+$("#authToggle").onclick=()=>setAuthMode(authMode==="signup"?"signin":"signup");
+$("#authPass").addEventListener("keydown",e=>{ if(e.key==="Enter") doAuth(); });
+$("#logoutBtn").onclick=logout;
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{
   const v=b.dataset.view; if(v!=="log" && editingId) clearForm(); if(v==="jobs") viewDate=null; showView(v); });
 document.addEventListener("click",e=>{ if(!e.target.closest(".combo")) document.querySelectorAll(".combo-list").forEach(l=>l.classList.remove("open")); });
 clearForm();
-window.addEventListener("load", initSupa);
-document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") pullAll(); });
-renderJobs(); renderStats();
-showView(load("joblog.view.v1","log"));
+window.addEventListener("load", boot);
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible" && currentUser) pullAll(); });
 </script>
 </body>
 </html>
